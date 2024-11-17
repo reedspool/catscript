@@ -901,12 +901,18 @@ export function query({ ctx }: { ctx: Context }) {
     // Unlike Jonesforth, don't begin with Quit because it's valid in CatScript to
     // run with a non-empty, meaningful return stack, as in the case of async code
     // which is resuming
-    while (!ctx.halted && !ctx.paused) {
-        if (ctx.returnStack.length !== 0) {
-            executeColonDefinition({ ctx });
-        } else {
-            coreWordImpl("interpret")({ ctx });
+    try {
+        while (!ctx.halted && !ctx.paused) {
+            if (ctx.returnStack.length !== 0) {
+                executeColonDefinition({ ctx });
+            } else {
+                coreWordImpl("interpret")({ ctx });
+            }
         }
+    } catch (error) {
+        console.error("ERROR CAUSED INTERPRETER TO EXIT");
+        console.error(error);
+        coreWordImpl("debugger")({ ctx });
     }
 }
 
