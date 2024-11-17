@@ -3,6 +3,10 @@ import { load } from "./browser.ts";
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
 import { expect, test, describe, beforeEach } from "bun:test";
 
+// For IDE formatting. See https://prettier.io/blog/2020/08/24/2.1.0.html
+export const html: typeof String.raw = (templates, ...args) =>
+    String.raw(templates, ...args);
+
 load();
 GlobalRegistrator.register();
 type MyTests = Record<
@@ -19,7 +23,7 @@ describe("DOM Basics", () => {
         ctx = { ...newCtx(), me: document };
     });
     test("DOM works", () => {
-        document.body.innerHTML = `<button>My button</button>`;
+        document.body.innerHTML = html`<button>My button</button>`;
         const button = document.querySelector("button");
         expect(button?.innerText).toEqual("My button");
     });
@@ -31,7 +35,7 @@ describe("DOM Basics", () => {
     });
 
     test(">text", () => {
-        document.body.innerHTML = `<button>My button</button>`;
+        document.body.innerHTML = html`<button>My button</button>`;
         const button = document.querySelector("button");
 
         ctx.inputStream = "' It works!' C . me >text";
@@ -43,7 +47,7 @@ describe("DOM Basics", () => {
     });
 
     test("text>", () => {
-        document.body.innerHTML = `<button>My button</button>`;
+        document.body.innerHTML = html`<button>My button</button>`;
         const button = document.querySelector("button");
 
         ctx.inputStream = "C . me text>";
@@ -53,7 +57,7 @@ describe("DOM Basics", () => {
     });
 
     test("addClass", () => {
-        document.body.innerHTML = `<button>My button</button>`;
+        document.body.innerHTML = html`<button>My button</button>`;
         const button = document.querySelector("button");
 
         ctx.inputStream = "' clazz' C . me addClass";
@@ -64,7 +68,9 @@ describe("DOM Basics", () => {
     });
 
     test("removeClass", () => {
-        document.body.innerHTML = `<button class="clazz">My button</button>`;
+        document.body.innerHTML = html`<button class="clazz">
+            My button
+        </button>`;
         const button = document.querySelector("button");
 
         ctx.inputStream = "' clazz' C . me removeClass";
@@ -75,7 +81,9 @@ describe("DOM Basics", () => {
     });
 
     test("toggleClass", () => {
-        document.body.innerHTML = `<button class="clazz">My button</button>`;
+        document.body.innerHTML = html`<button class="clazz">
+            My button
+        </button>`;
         const button = document.querySelector("button");
 
         ctx.inputStream = "' clazz' C . me toggleClass";
@@ -91,7 +99,9 @@ describe("DOM Basics", () => {
     });
 
     test("select", () => {
-        document.body.innerHTML = `<span><button class="clazz">My button</button></span>`;
+        document.body.innerHTML = html`<span
+            ><button class="clazz">My button</button></span
+        >`;
         const span = document.querySelector("span");
 
         ctx.inputStream = "' button' C . me select first";
@@ -102,7 +112,9 @@ describe("DOM Basics", () => {
     });
 
     test("select' parsing word", () => {
-        document.body.innerHTML = `<span><button class="clazz">My button</button></span>`;
+        document.body.innerHTML = html`<span
+            ><button class="clazz">My button</button></span
+        >`;
         const span = document.querySelector("span");
 
         ctx.inputStream = "C . me select' button' first";
@@ -113,7 +125,9 @@ describe("DOM Basics", () => {
     });
 
     test("on", () => {
-        document.body.innerHTML = `<span><button class="clazz">My button</button></span>`;
+        document.body.innerHTML = html`<span
+            ><button class="clazz">My button</button></span
+        >`;
         const button = document.querySelector("button");
 
         ctx.inputStream = "on click ' Success!' C . me >text";
@@ -125,7 +139,10 @@ describe("DOM Basics", () => {
     });
 
     test("next", () => {
-        document.body.innerHTML = `<span><span>Don't find me</span><button>start here</button><span>Find me</span></span>`;
+        document.body.innerHTML = html`<span
+            ><span>Don't find me</span><button>start here</button
+            ><span>Find me</span></span
+        >`;
         const button = document.querySelector("button");
 
         ctx.inputStream = "' span' C . me next";
@@ -136,7 +153,10 @@ describe("DOM Basics", () => {
     });
 
     test("previous", () => {
-        document.body.innerHTML = `<span><span>Find me</span><button>start here</button><span>Don't find me</span></span>`;
+        document.body.innerHTML = html`<span
+            ><span>Find me</span><button>start here</button
+            ><span>Don't find me</span></span
+        >`;
         const button = document.querySelector("button");
 
         ctx.inputStream = "' span' C . me previous";
@@ -147,7 +167,13 @@ describe("DOM Basics", () => {
     });
 
     test("closest", () => {
-        document.body.innerHTML = `<span><span>Don't find me<span>Find me<button>start here</button></span></span></span>`;
+        document.body.innerHTML = html`<span
+            ><span
+                >Don't find me<span
+                    >Find me<button>start here</button></span
+                ></span
+            ></span
+        >`;
         const button = document.querySelector("button");
 
         ctx.inputStream = "' span' C . me closest";
@@ -160,7 +186,9 @@ describe("DOM Basics", () => {
     });
 
     test("on", () => {
-        document.body.innerHTML = `<span><button class="clazz">My button</button></span>`;
+        document.body.innerHTML = html`<span
+            ><button class="clazz">My button</button></span
+        >`;
         const button = document.querySelector("button");
 
         ctx.inputStream =
