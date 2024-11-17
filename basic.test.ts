@@ -195,6 +195,21 @@ describe("Core - Synchronous", () => {
         resultantStack: [true],
     };
 
+    tests["match/ regular expressions parsed within : definition"] = {
+        input: ": matchy match/ e\\\\d+/ first ; ' te123st' matchy ' e123' ===",
+        resultantStack: [true],
+    };
+
+    tests["C and . operators"] = {
+        input: "5 C . parameterStack first ===",
+        resultantStack: [true],
+    };
+
+    tests[".! operator"] = {
+        input: "C . inputStream '  true' + C .! inputStream",
+        resultantStack: [true],
+    };
+
     Object.entries(tests).forEach(([key, { input, resultantStack }]) => {
         test(key, async () => {
             ctx.inputStream = input;
