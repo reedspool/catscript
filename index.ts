@@ -178,10 +178,6 @@ define({
     impl: ({ ctx }) => ctx.pop(),
 });
 define({
-    name: "me",
-    impl: ({ ctx }) => ctx.push(ctx.me),
-});
-define({
     name: "'",
     isImmediate: true,
     impl: ({ ctx }) => {
@@ -699,7 +695,8 @@ define({
 define({
     name: "debugger",
     impl: ({ ctx }) => {
-        console.log("Interpreter paused with context:", ctx);
+        console.log("Interpreter paused");
+        // console.log("Context:", ctx)
         console.log(
             `Here is the input stream, with \`<--!-->\` marking the input stream pointer`,
         );
