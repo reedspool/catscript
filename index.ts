@@ -910,6 +910,7 @@ export function query({ ctx }: { ctx: Context }) {
         console.error("ERROR CAUSED INTERPRETER TO EXIT");
         console.error(error);
         coreWordImpl("debugger")({ ctx });
+        throw error;
     }
 }
 

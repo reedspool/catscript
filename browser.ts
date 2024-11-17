@@ -283,9 +283,9 @@ export function load() {
     define({
         name: "closest",
         impl: ({ ctx }) => {
-            const [selector, element] = [
-                ctx.pop() as string,
+            const [element, selector] = [
                 ctx.pop() as Element,
+                ctx.pop() as string,
             ];
             const result = element.parentElement!.closest(selector);
             ctx.push(result);

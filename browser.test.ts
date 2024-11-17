@@ -111,4 +111,63 @@ describe("DOM Basics", () => {
         expect(ctx.parameterStack.length).toEqual(1);
         expect((ctx.parameterStack[0] as Element).tagName).toEqual("BUTTON");
     });
+
+    test("on", () => {
+        document.body.innerHTML = `<span><button class="clazz">My button</button></span>`;
+        const button = document.querySelector("button");
+
+        ctx.inputStream = "on click ' Success!' C . me >text";
+        ctx.me = button;
+        query({ ctx });
+        button!.click();
+        expect(ctx.parameterStack).toEqual([]);
+        expect(button!.innerHTML).toEqual("Success!");
+    });
+
+    test("next", () => {
+        document.body.innerHTML = `<span><span>Don't find me</span><button>start here</button><span>Find me</span></span>`;
+        const button = document.querySelector("button");
+
+        ctx.inputStream = "' span' C . me next";
+        ctx.me = button;
+        query({ ctx });
+        expect(ctx.parameterStack.length).toEqual(1);
+        expect((ctx.parameterStack[0] as Element).innerHTML).toEqual("Find me");
+    });
+
+    test("previous", () => {
+        document.body.innerHTML = `<span><span>Find me</span><button>start here</button><span>Don't find me</span></span>`;
+        const button = document.querySelector("button");
+
+        ctx.inputStream = "' span' C . me previous";
+        ctx.me = button;
+        query({ ctx });
+        expect(ctx.parameterStack.length).toEqual(1);
+        expect((ctx.parameterStack[0] as Element).innerHTML).toEqual("Find me");
+    });
+
+    test("closest", () => {
+        document.body.innerHTML = `<span><span>Don't find me<span>Find me<button>start here</button></span></span></span>`;
+        const button = document.querySelector("button");
+
+        ctx.inputStream = "' span' C . me closest";
+        ctx.me = button;
+        query({ ctx });
+        expect(ctx.parameterStack.length).toEqual(1);
+        expect((ctx.parameterStack[0] as Element).innerHTML).toStartWith(
+            "Find me",
+        );
+    });
+
+    test("on", () => {
+        document.body.innerHTML = `<span><button class="clazz">My button</button></span>`;
+        const button = document.querySelector("button");
+
+        ctx.inputStream =
+            "on click ' Success!' C . me >text ; C . me ' click' emit";
+        ctx.me = button;
+        query({ ctx });
+        expect(ctx.parameterStack).toEqual([]);
+        expect(button!.innerHTML).toEqual("Success!");
+    });
 });
