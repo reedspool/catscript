@@ -88,11 +88,11 @@ describe("Core - Synchronous", () => {
         resultantStack: [1],
     };
     tests["Defined word calls another defined word"] = {
-        input: ": first 3 ; : second 4 first ; second",
+        input: ": inner 3 ; : outer 4 inner ; outer",
         resultantStack: [4, 3],
     };
     tests["Defined word calls another defined word"] = {
-        input: ": first 3 ; : second 4 first ; second",
+        input: ": inner 3 ; : outer 4 inner ; outer",
         resultantStack: [4, 3],
     };
     tests["immediate"] = {
@@ -182,6 +182,16 @@ describe("Core - Synchronous", () => {
 
     tests["( comments )"] = {
         input: " : checky ( comment in definition ) true ; checky ( this is a comment, it can contain anything ✅ except a closing paren )",
+        resultantStack: [true],
+    };
+
+    tests["match regular expressions"] = {
+        input: "re/ e\\\\d+/ ' te123st' match first ' e123' ===",
+        resultantStack: [true],
+    };
+
+    tests["match/ regular expressions parsed"] = {
+        input: "' te123st' match/ e\\\\d+/ first ' e123' ===",
         resultantStack: [true],
     };
 
