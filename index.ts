@@ -813,7 +813,7 @@ define({
     },
 });
 
-function findDictionaryEntry({ word }: { word: Dictionary["name"] }) {
+export function findDictionaryEntry({ word }: { word: Dictionary["name"] }) {
     let entry = latest;
 
     while (entry) {

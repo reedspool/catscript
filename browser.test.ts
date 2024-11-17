@@ -101,4 +101,14 @@ describe("DOM Basics", () => {
         expect((ctx.parameterStack[0] as Element).tagName).toEqual("BUTTON");
     });
 
+    test("select' parsing word", () => {
+        document.body.innerHTML = `<span><button class="clazz">My button</button></span>`;
+        const span = document.querySelector("span");
+
+        ctx.inputStream = "C . me select' button' first";
+        ctx.me = span;
+        query({ ctx });
+        expect(ctx.parameterStack.length).toEqual(1);
+        expect((ctx.parameterStack[0] as Element).tagName).toEqual("BUTTON");
+    });
 });

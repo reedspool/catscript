@@ -1,4 +1,12 @@
-import { newCtx, query, define } from "./index";
+import {
+    newCtx,
+    query,
+    define,
+    coreWordImpl,
+    consume,
+    findDictionaryEntry,
+    type Dictionary,
+} from "./index";
 
 /**
  * Web/browser specific things
@@ -87,7 +95,7 @@ export function load() {
                 const selector = consume({ until: "'", including: true, ctx });
                 ctx.push(selector);
                 ctx.push(element);
-                coreWordImpl("select")({ ctx });
+                findDictionaryEntry({ word: "select" })!.impl({ ctx });
             }
         },
     });
