@@ -95,6 +95,10 @@ describe("Core - Synchronous", () => {
         input: ": inner 3 ; : outer 4 inner ; outer",
         resultantStack: [4, 3],
     };
+    tests["word"] = {
+        input: "word nowhitespace true",
+        resultantStack: ["nowhitespace", true],
+    };
     tests["immediate"] = {
         input: ": bury immediate tick lit , ' Bury' , tick swap , ; : pushCheck ' Top' bury ; pushCheck",
         resultantStack: ["Bury", "Top"],

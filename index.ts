@@ -279,6 +279,19 @@ define({
 });
 
 define({
+    name: "word",
+    impl: ({ ctx }) => {
+        const word = consume({
+            until: /\s/,
+            ignoreLeadingWhitespace: true,
+            ctx,
+        });
+
+        ctx.push(word);
+    },
+});
+
+define({
     name: "interpret",
     impl: ({ ctx }) => {
         const { interpreter } = ctx;
@@ -290,11 +303,8 @@ define({
             return;
         }
 
-        const word = consume({
-            until: /\s/,
-            ignoreLeadingWhitespace: true,
-            ctx,
-        });
+        coreWordImpl("word")({ ctx });
+        const word = ctx.pop() as string;
 
         // Input only had whitespace, will halt on the next call to `execute`.
         if (!word.match(/\S/)) return;
@@ -334,11 +344,9 @@ define({
     impl: ({ ctx }) => {
         let dictionaryEntry: typeof latest;
 
-        const name = consume({
-            until: /\s/,
-            ignoreLeadingWhitespace: true,
-            ctx,
-        });
+        coreWordImpl("word")({ ctx });
+        const name = ctx.pop() as string;
+
         define({
             name,
             impl: ({ ctx }) => {
@@ -392,11 +400,9 @@ define({
     name: "postpone",
     isImmediate: true,
     impl: ({ ctx }) => {
-        const word = consume({
-            until: /\s/,
-            ignoreLeadingWhitespace: true,
-            ctx,
-        });
+        coreWordImpl("word")({ ctx });
+        const word = ctx.pop() as string;
+
         const dictionaryEntry = findDictionaryEntry({ word });
         if (!dictionaryEntry) {
             throw new Error(
@@ -752,7 +758,8 @@ define({
         if (ctx.interpreter === "compileWord") {
             // Move cursor past the single blank space between
             ctx.inputStreamPointer++;
-            const prop = consume({ until: /\s/, including: true, ctx });
+            coreWordImpl("word")({ ctx });
+            const prop = ctx.pop() as string;
 
             const impl: Dictionary["impl"] = ({ ctx }) => {
                 const obj = ctx.pop() as any;
@@ -762,7 +769,9 @@ define({
         } else {
             // Move cursor past the single blank space between
             ctx.inputStreamPointer++;
-            const prop = consume({ until: /\s/, including: true, ctx });
+            coreWordImpl("word")({ ctx });
+            const prop = ctx.pop() as string;
+
             const obj = ctx.pop() as any;
 
             ctx.push(obj[prop]);
@@ -778,7 +787,8 @@ define({
         if (ctx.interpreter === "compileWord") {
             // Move cursor past the single blank space between
             ctx.inputStreamPointer++;
-            const prop = consume({ until: /\s/, including: true, ctx });
+            coreWordImpl("word")({ ctx });
+            const prop = ctx.pop() as string;
 
             const impl: Dictionary["impl"] = ({ ctx }) => {
                 const obj = ctx.pop() as any;
@@ -789,7 +799,9 @@ define({
         } else {
             // Move cursor past the single blank space between
             ctx.inputStreamPointer++;
-            const prop = consume({ until: /\s/, including: true, ctx });
+            coreWordImpl("word")({ ctx });
+            const prop = ctx.pop() as string;
+
             const obj = ctx.pop() as any;
 
             const value = ctx.pop() as any;

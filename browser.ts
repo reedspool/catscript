@@ -106,11 +106,9 @@ export function load() {
     define({
         name: "on",
         impl: ({ ctx }) => {
-            const event = consume({
-                until: /\s/,
-                ignoreLeadingWhitespace: true,
-                ctx,
-            });
+            coreWordImpl("word")({ ctx });
+            const event = ctx.pop() as string;
+
             // By not using `define` we don't adjust the dictionary pointer `latest`.
             // This is a divergence from Forth implementations I've seen, and I'm calling
             // it an "anonymous dictionary entry".
