@@ -160,6 +160,60 @@ export function load() {
         },
     });
 
+    define({
+        name: "addEventListener",
+        impl: ({ ctx }) => {
+            const [event, impl, target] = [
+                ctx.pop() as string,
+                ctx.pop() as Dictionary["impl"],
+                ctx.pop() as Element,
+            ];
+
+            // By not using `define` we don't adjust the dictionary pointer `latest`.
+            // This is a divergence from Forth implementations I've seen, and I'm calling
+            // it an "anonymous dictionary entry".
+            // NOTE: I did see someone describe an implementation which allowed
+            //       control structures like if's and loops at the base level, and
+            //       this might be how they did it. If any control structure
+            //       called outside of a compiled definition initiated such a
+            //       anonymous compilation, then it could be dropped when the
+            //       control structure finishes.
+            //       In fact, i'm struggling to see why everything on a REPL shouldn't
+            //       just be getting compiled into a colon definiton AND ALSO getting
+            //       executed until the instruction pointer goes to the end?
+            const dictionaryEntry: Dictionary = {
+                name: `anonymous-on-${event}-handler`,
+                previous: null,
+                compiled: [impl],
+                impl() {
+                    throw new Error(
+                        `Uncallable dictionary entry ${this.name} called`,
+                    );
+                },
+            };
+
+            target.addEventListener(event, ({ target }) => {
+                // When the event occurs, we will run an independent interpreter (new ctx)
+                // with this anonymous dictionary entry already on the return stack. This
+                // is almost exactly as if this were a colon definition named `x` and then
+                // ran a program where `x` was the only word in the input stream.
+                query({
+                    ctx: {
+                        ...newCtx(),
+                        me: target,
+                        returnStack: [
+                            {
+                                dictionaryEntry,
+                                i: 0,
+                                prevInterpreter: "queryWord", // Unused, I believe
+                            },
+                        ],
+                    },
+                });
+            });
+        },
+    });
+
     // Stolen with love from Hyperscript https://hyperscript.org and converted to TS
     var scanForwardQuery = function (
         start: Node,

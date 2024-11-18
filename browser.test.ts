@@ -198,4 +198,16 @@ describe("DOM Basics", () => {
         expect(ctx.parameterStack).toEqual([]);
         expect(button!.innerHTML).toEqual("Success!");
     });
+
+    test("addEventListener", () => {
+        document.body.innerHTML = html`<span><button>My button</button></span>`;
+        const button = document.querySelector("button");
+
+        ctx.inputStream =
+            ": onclick ' Whoops!' C . me >text ; C . me ' onclick' find . impl ' click' addEventListener C . me ' click' emit";
+        ctx.me = button;
+        query({ ctx });
+        expect(ctx.parameterStack).toEqual([]);
+        expect(button!.innerHTML).toEqual("Whoops!");
+    });
 });
