@@ -292,6 +292,25 @@ define({
 });
 
 define({
+    name: "find",
+    impl: ({ ctx }) => {
+        const word = ctx.pop() as string;
+        let entry = latest;
+
+        while (entry) {
+            if (entry.name == word) {
+                ctx.push(entry);
+                return;
+            }
+            entry = entry.previous;
+        }
+
+        ctx.push(undefined);
+        return;
+    },
+});
+
+define({
     name: "interpret",
     impl: ({ ctx }) => {
         const { interpreter } = ctx;
@@ -307,9 +326,12 @@ define({
         const word = ctx.pop() as string;
 
         // Input only had whitespace, will halt on the next call to `execute`.
+        // TODO: Is this necessary? We're popping word and then pushing it back
         if (!word.match(/\S/)) return;
 
-        const dictionaryEntry = findDictionaryEntry({ word });
+        ctx.push(word);
+        coreWordImpl("find")({ ctx });
+        const dictionaryEntry = ctx.pop() as Dictionary | undefined;
 
         if (!dictionaryEntry) {
             const primitiveMaybe = wordAsPrimitive({ word });
@@ -401,9 +423,8 @@ define({
     isImmediate: true,
     impl: ({ ctx }) => {
         coreWordImpl("word")({ ctx });
-        const word = ctx.pop() as string;
-
-        const dictionaryEntry = findDictionaryEntry({ word });
+        coreWordImpl("find")({ ctx });
+        const dictionaryEntry = ctx.pop() as Dictionary | undefined;
         if (!dictionaryEntry) {
             throw new Error(
                 `Couldn't find dictionary entry to POSTPONE ('${word}')`,
@@ -825,15 +846,17 @@ define({
     },
 });
 
-export function findDictionaryEntry({ word }: { word: Dictionary["name"] }) {
-    let entry = latest;
-
-    while (entry) {
-        if (entry.name == word) return entry;
-        entry = entry.previous;
-    }
-
-    return undefined;
+export function findDictionaryEntry({
+    word,
+    ctx,
+}: {
+    word: Dictionary["name"];
+    ctx: Context;
+}) {
+    ctx.push(word);
+    coreWordImpl("find")({ ctx });
+    const dictionaryEntry = ctx.pop() as Dictionary | undefined;
+    return dictionaryEntry;
 }
 
 // Because a primitive value can be any of the falsy JS values, we can't signal

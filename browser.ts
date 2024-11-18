@@ -4,7 +4,6 @@ import {
     define,
     coreWordImpl,
     consume,
-    findDictionaryEntry,
     type Dictionary,
 } from "./index";
 
@@ -95,7 +94,10 @@ export function load() {
                 const selector = consume({ until: "'", including: true, ctx });
                 ctx.push(selector);
                 ctx.push(element);
-                findDictionaryEntry({ word: "select" })!.impl({ ctx });
+                ctx.push("select");
+                coreWordImpl("find")({ ctx });
+                const dictionaryEntry = ctx.pop() as Dictionary;
+                dictionaryEntry.impl({ ctx });
             }
         },
     });
