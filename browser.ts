@@ -350,4 +350,31 @@ export function runAttributes() {
             );
         }
     });
+
+    document.querySelectorAll("script[type*=catscript]").forEach((script) => {
+        const inputStream = script.textContent;
+        if (inputStream === null) {
+            console.warn("Skipping script with null textContent", script);
+            return;
+        }
+        const ctx = { ...newCtx(), me: script, inputStream };
+        try {
+            query({
+                ctx,
+            });
+        } catch (error) {
+            console.error(`Error in script:\n\n"${inputStream}"`);
+            console.error(error);
+            console.error("Context after error", ctx);
+            console.error(
+                `Here is the input stream, with \`<--!-->\` marking the input stream pointer`,
+            );
+            console.error(
+                `${ctx.inputStream.slice(
+                    0,
+                    ctx.inputStreamPointer,
+                )}<--!-->${ctx.inputStream.slice(ctx.inputStreamPointer)}`,
+            );
+        }
+    });
 }
