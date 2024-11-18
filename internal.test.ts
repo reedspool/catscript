@@ -1,4 +1,4 @@
-import { newCtx, consume, consumeMulti, type Context } from "./index";
+import { newCtx, consume, type Context } from "./index";
 import { expect, test, describe, beforeEach } from "bun:test";
 
 describe("Internals - consume", () => {
