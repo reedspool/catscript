@@ -4,11 +4,16 @@
   "type": "module",
   "scripts": {
     "test": "bun test",
-    "test:watch": "bun test --watch"
+    "test:watch": "bun test --watch",
+    "build": "bun build.ts",
+    "build:watch": "bun build.ts --watch",
+    "build:watchAll": "while true; do bun build.ts --watch ; echo 'Restarting after a moment to account for formatting...' && sleep 1; done",
+    "serve": "bun run ws"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^15.11.6",
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "local-web-server": "^5.4.0"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"
