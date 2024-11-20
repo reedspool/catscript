@@ -815,6 +815,21 @@ define({
     },
 });
 
+define({
+    name: "globalThis",
+    impl({ ctx }) {
+        ctx.push(globalThis);
+    },
+});
+
+define({
+    name: "jsApply",
+    impl({ ctx }) {
+        const [fn, args] = [ctx.pop() as Function, ctx.pop() as Array<unknown>];
+        ctx.push(fn.apply(undefined, args));
+    },
+});
+
 export function findDictionaryEntry({
     word,
     ctx,
@@ -1088,6 +1103,37 @@ query({
 /**
  * JavaScript stuff
  */
+define({
+    name: "[]",
+    impl: ({ ctx }) => {
+        ctx.push([]);
+    },
+});
+
+define({
+    name: "push",
+    impl: ({ ctx }) => {
+        const [item, array] = [ctx.pop(), ctx.pop() as Array<unknown>];
+        array.push(item);
+        ctx.push(array);
+    },
+});
+
+define({
+    name: "pop",
+    impl: ({ ctx }) => {
+        const [array] = [ctx.pop() as Array<unknown>];
+        ctx.push(array.pop());
+    },
+});
+
+define({
+    name: "{}",
+    impl: ({ ctx }) => {
+        ctx.push({});
+    },
+});
+
 // Get the first item in an array
 define({
     name: "first",
