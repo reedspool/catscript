@@ -1,5 +1,13 @@
 import { newCtx, query, type Context } from "./index";
-import { expect, test, describe, beforeEach } from "bun:test";
+import {
+    expect,
+    test,
+    describe,
+    beforeEach,
+    afterEach,
+    spyOn,
+    mock,
+} from "bun:test";
 
 type MyTests = Record<
     string,
@@ -54,6 +62,10 @@ describe("Core - Synchronous", () => {
     tests["dup"] = {
         input: "111 dup",
         resultantStack: [111, 111],
+    };
+    tests["2dup"] = {
+        input: "111 222 2dup",
+        resultantStack: [111, 222, 111, 222],
     };
     tests["drop"] = {
         input: "222 111 drop",
@@ -218,6 +230,31 @@ describe("Core - Synchronous", () => {
         resultantStack: [true],
     };
 
+    tests["quit"] = {
+        input: ": inner 42 quit ; : outer inner 33 ; outer true",
+        resultantStack: [42, true],
+    };
+
+    tests["latest"] = {
+        input: ": tempWord ; latest . name",
+        resultantStack: ["tempWord"],
+    };
+
+    tests["variable"] = {
+        input: "variable varz 5 varz ! varz @",
+        resultantStack: [5],
+    };
+
+    tests["debugger"] = {
+        input: "debugger",
+        resultantStack: [],
+    };
+
+    tests["'debugger"] = {
+        input: "'debugger",
+        resultantStack: [],
+    };
+
     Object.entries(tests).forEach(([key, { input, resultantStack }]) => {
         test(key, async () => {
             ctx.inputStream = input;
@@ -262,5 +299,93 @@ describe("Core - Asynchronous", () => {
             // test if the promise never resolves.
             await expect(ctx.haltedPromise).resolves.toBeUndefined();
         });
+    });
+});
+
+describe("Core - mocked", () => {
+    let ctx: Context;
+    beforeEach(() => {
+        ctx = newCtx();
+    });
+    afterEach(() => {
+        mock.restore();
+    });
+
+    test("log", () => {
+        const spy = spyOn(console, "log");
+        ctx.inputStream = "42 log";
+        query({ ctx });
+        expect(spy).toHaveBeenCalledTimes(1);
+        expect(spy).toHaveBeenCalledWith(42);
+    });
+
+    test(".s", () => {
+        const spy = spyOn(console, "log");
+        ctx.inputStream = "42 ' test' .s";
+        query({ ctx });
+        expect(spy).toHaveBeenCalledTimes(1);
+        expect(spy).toHaveBeenCalledWith("<2> 42 test");
+    });
+});
+
+describe("Core - errors", () => {
+    let ctx: Context;
+    beforeEach(() => {
+        ctx = newCtx();
+    });
+
+    test("Undefined word", () => {
+        ctx.inputStream = "thisWordIsUndefined";
+        expect(() => query({ ctx })).toThrowError();
+    });
+
+    test("Incorrect usage of here", () => {
+        ctx.inputStream = "here";
+        expect(() => query({ ctx })).toThrowError(
+            "Can't use `here` outside of a definition",
+        );
+    });
+
+    test("Incorrect usage of -stackFrame", () => {
+        ctx.inputStream = "5 5 -stackFrame";
+        expect(() => query({ ctx })).toThrowError(
+            "`-stackFrame` requires two stackFrame parameters",
+        );
+    });
+
+    test("Another incorrect usage of -stackFrame", () => {
+        ctx.inputStream =
+            ": inner here ; immediate : outer1 inner ; outer1 : outer2 inner ; outer2 -stackFrame";
+        expect(() => query({ ctx })).toThrowError(
+            "`-stackFrame` across different dictionary entries not supported",
+        );
+    });
+
+    test("Incorrect usage of branch", () => {
+        ctx.inputStream = ": branchy branch ' f' ; branchy";
+        expect(() => query({ ctx })).toThrowError(
+            "`branch` must be followed by a number",
+        );
+    });
+
+    test("Incorrect usage of 0branch", () => {
+        ctx.inputStream = ": 0branchy ' f' 0branch ; 0branchy";
+        expect(() => query({ ctx })).toThrowError(
+            "`0branch` found a non-number on the stack (f) which indicates an error. If you want to use arbitrary values, try falsyBranch instead.",
+        );
+    });
+
+    test("Another incorrect usage of 0branch", () => {
+        ctx.inputStream = ": 0branchy 5 0branch ' f' ; 0branchy";
+        expect(() => query({ ctx })).toThrowError(
+            "`0branch` must be followed by a number",
+        );
+    });
+
+    test("Incorrect usage of falsyBranch", () => {
+        ctx.inputStream = ": falsyBranchy ' f' falsyBranch ; falsyBranchy";
+        expect(() => query({ ctx })).toThrowError(
+            "`falsyBranch` must be followed by a number",
+        );
     });
 });

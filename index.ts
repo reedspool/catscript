@@ -345,12 +345,9 @@ define({
                     ctx.compilationTarget!.compiled!.push(primitiveMaybe.value);
                     return;
                 }
-            } else {
-                throw new Error(`Couldn't comprehend word '${word}'`);
             }
-            //@ts-expect-error: Reminder to myself that if it's a primitive, it must
-            //                  return. Probably a better code structure could avoid.
-            throw new Error("Assertion failed: unreachable code");
+
+            throw new Error(`Couldn't comprehend word '${word}'`);
         }
 
         if (interpreter === "queryWord" || dictionaryEntry.isImmediate) {
@@ -426,9 +423,7 @@ define({
         coreWordImpl("find")({ ctx });
         const dictionaryEntry = ctx.pop() as Dictionary | undefined;
         if (!dictionaryEntry) {
-            throw new Error(
-                `Couldn't find dictionary entry to POSTPONE ('${word}')`,
-            );
+            throw new Error(`Couldn't find dictionary entry to POSTPONE`);
         }
         // This replicates a lot of the logic structure from compileWord,
         // except it compiles the "compile time" semantics, i.e. it never
@@ -509,20 +504,7 @@ define({
 define({
     name: "latest",
     impl: ({ ctx }) => {
-        // getter/setter object onto the stack
-        // and then the @ word will access the getter
-        // and the ! word will use the setter
-        // TODO Could we use the dictionary entry object itself for this?
-        const variable: Variable = {
-            getter: () => latest,
-            setter: (_value: unknown) => {
-                console.warn(
-                    "Setting internal value `latest` - are you sure you wanted to do that?",
-                );
-                latest = _value as Dictionary;
-            },
-        };
-        ctx.push(variable);
+        ctx.push(latest);
     },
 });
 
@@ -533,6 +515,8 @@ define({
         //       implementing now because I want to implement tests asserting thrown
         //       errors first
         const dictionaryEntry = ctx.compilationTarget;
+        if (!dictionaryEntry)
+            throw new Error("Can't use `here` outside of a definition");
         const i = dictionaryEntry?.compiled?.length || 0;
         // This shape merges the "return stack frame" and the "variable" types to
         // refer to a location within a dictionary entry's "compiled" data. In Forth,
@@ -580,18 +564,6 @@ define({
             );
         }
         ctx.push(a.i - b.i);
-    },
-});
-
-define({
-    name: "allot",
-    impl: ({ ctx }) => {
-        const amount = ctx.pop();
-        if (typeof amount !== "number")
-            throw new Error("`allot` requires a number");
-        if (!ctx.compilationTarget!.compiled)
-            ctx.compilationTarget!.compiled = [];
-        ctx.compilationTarget!.compiled.length += amount;
     },
 });
 
@@ -654,11 +626,8 @@ define({
 define({
     name: "variable",
     impl: ({ ctx }) => {
-        const name = consume({
-            until: /\s/,
-            ignoreLeadingWhitespace: true,
-            ctx,
-        });
+        coreWordImpl("word")({ ctx });
+        const name = ctx.pop() as string;
         // This variable is actually going to be the
         // value of the variable, via JavaScript closures
         let value: unknown;
