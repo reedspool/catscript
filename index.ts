@@ -1115,7 +1115,6 @@ define({
     impl: ({ ctx }) => {
         const [item, array] = [ctx.pop(), ctx.pop() as Array<unknown>];
         array.push(item);
-        ctx.push(array);
     },
 });
 
@@ -1170,11 +1169,21 @@ define({
     },
 });
 
+define({
+    name: "control>",
+    impl: ({ ctx }) => {
+        ctx.push(ctx.controlStack.pop());
+    },
+});
+
 // Loop over an array, pushing interstitial values to the return stack
 define({
     name: "foreach",
     isImmediate: true,
     impl: ({ ctx }) => {
+        if (!ctx.compilationTarget) {
+            throw new Error("Can't use foreach outside of compilation");
+        }
         ctx.compilationTarget!.compiled!.push(coreWordImpl("clone"));
         ctx.compilationTarget!.compiled!.push(coreWordImpl(">control"));
         ctx.compilationTarget!.compiled!.push(coreWordImpl("lit"));

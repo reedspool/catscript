@@ -1,4 +1,4 @@
-import { newCtx, consume, type Context } from "./index";
+import { newCtx, consume, type Context, findDictionaryEntry } from "./index";
 import { expect, test, describe, beforeEach } from "bun:test";
 
 describe("Internals - consume", () => {
@@ -35,5 +35,24 @@ describe("Internals - consume", () => {
         ctx.inputStreamPointer = 4;
         const result = consume({ ctx, until: "h" });
         expect(result).toBe("efg");
+    });
+});
+
+describe("Internals - findDictionaryEntry", () => {
+    let ctx: Context;
+    beforeEach(() => {
+        ctx = newCtx();
+    });
+
+    test("core word", () => {
+        const result = findDictionaryEntry({ ctx, word: "dup" });
+        if (!result) throw new Error("Failed to find word");
+        expect(result).toHaveProperty("name", "dup");
+        expect(typeof result.impl).toBe("function");
+    });
+
+    test("non-existant word", () => {
+        const result = findDictionaryEntry({ ctx, word: "abcd" });
+        expect(result).toBeUndefined();
     });
 });

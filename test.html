@@ -33,7 +33,7 @@
        ' p' C . me previous
        ' span' swap select first
       ( Run the next word as if it were an immediate word )
-      : immediately immediate word find . impl [] {} dup C swap .! ctx push swap jsApply ;
+      : immediately immediate word find . impl [] dup {} dup C swap .! ctx push swap jsApply ;
       : onclick ' Clicked! (script tag)' lit immediately , >text ;
       ' button' C . me previous
       word onclick find . impl ' click' addEventListener

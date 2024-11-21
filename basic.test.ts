@@ -230,6 +230,11 @@ describe("Core - Synchronous", () => {
         resultantStack: [true],
     };
 
+    tests[".! operator in definition"] = {
+        input: ": def C . inputStream '  true' + C .! inputStream ; def",
+        resultantStack: [true],
+    };
+
     tests["quit"] = {
         input: ": inner 42 quit ; : outer inner 33 ; outer true",
         resultantStack: [42, true],
@@ -248,6 +253,51 @@ describe("Core - Synchronous", () => {
     tests["debugger"] = {
         input: "debugger",
         resultantStack: [],
+    };
+
+    tests["globalThis"] = {
+        input: "globalThis",
+        resultantStack: [globalThis],
+    };
+
+    tests["jsApply"] = {
+        input: "[] dup 0 push globalThis . Math . cos jsApply",
+        resultantStack: [1],
+    };
+
+    tests["[]"] = {
+        input: "[]",
+        resultantStack: [[]],
+    };
+
+    tests["{}"] = {
+        input: "{}",
+        resultantStack: [{}],
+    };
+
+    tests["push"] = {
+        input: "[] dup 0 push",
+        resultantStack: [[0]],
+    };
+
+    tests["pop"] = {
+        input: "[] dup 0 push dup 1 push dup pop",
+        resultantStack: [[0], 1],
+    };
+
+    tests["nth"] = {
+        input: "[] dup 3 push dup 4 push dup 5 push dup 1 nth",
+        resultantStack: [[3, 4, 5], 4],
+    };
+
+    tests["clone"] = {
+        input: "[] dup 3 push dup 4 push dup 5 push dup clone dup pop drop dup pop drop",
+        resultantStack: [[3, 4, 5], [3]],
+    };
+
+    tests[">control and control>"] = {
+        input: "5 >control 3 control> ",
+        resultantStack: [3, 5],
     };
 
     tests["'debugger"] = {
@@ -334,6 +384,11 @@ describe("Core - errors", () => {
         ctx = newCtx();
     });
 
+    test("throwNewError", () => {
+        ctx.inputStream = "' Expected error!' throwNewError";
+        expect(() => query({ ctx })).toThrowError("Expected error!");
+    });
+
     test("Undefined word", () => {
         ctx.inputStream = "thisWordIsUndefined";
         expect(() => query({ ctx })).toThrowError();
@@ -386,6 +441,13 @@ describe("Core - errors", () => {
         ctx.inputStream = ": falsyBranchy ' f' falsyBranch ; falsyBranchy";
         expect(() => query({ ctx })).toThrowError(
             "`falsyBranch` must be followed by a number",
+        );
+    });
+
+    test("Incorrect usage of foreach", () => {
+        ctx.inputStream = "foreach";
+        expect(() => query({ ctx })).toThrowError(
+            "Can't use foreach outside of compilation",
         );
     });
 });
