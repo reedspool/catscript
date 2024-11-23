@@ -250,11 +250,6 @@ describe("Core - Synchronous", () => {
         resultantStack: [5],
     };
 
-    tests["debugger"] = {
-        input: "debugger",
-        resultantStack: [],
-    };
-
     tests["globalThis"] = {
         input: "globalThis",
         resultantStack: [globalThis],
@@ -298,11 +293,6 @@ describe("Core - Synchronous", () => {
     tests[">control and control>"] = {
         input: "5 >control 3 control> ",
         resultantStack: [3, 5],
-    };
-
-    tests["'debugger"] = {
-        input: "'debugger",
-        resultantStack: [],
     };
 
     Object.entries(tests).forEach(([key, { input, resultantStack }]) => {
@@ -354,34 +344,56 @@ describe("Core - Asynchronous", () => {
 
 describe("Core - mocked", () => {
     let ctx: Context;
+    const consoleLog = console.log;
     beforeEach(() => {
         ctx = newCtx();
+
+        console.log = mock();
     });
     afterEach(() => {
-        mock.restore();
+        console.log = consoleLog;
     });
 
     test("log", () => {
-        const spy = spyOn(console, "log");
         ctx.inputStream = "42 log";
         query({ ctx });
-        expect(spy).toHaveBeenCalledTimes(1);
-        expect(spy).toHaveBeenCalledWith(42);
+        expect(console.log).toHaveBeenCalledTimes(1);
+        expect(console.log).toHaveBeenCalledWith(42);
     });
 
     test(".s", () => {
-        const spy = spyOn(console, "log");
         ctx.inputStream = "42 ' test' .s";
         query({ ctx });
-        expect(spy).toHaveBeenCalledTimes(1);
-        expect(spy).toHaveBeenCalledWith("<2> 42 test");
+        expect(console.log).toHaveBeenCalledTimes(1);
+        expect(console.log).toHaveBeenCalledWith("<2> 42 test");
+    });
+
+    test("debugger", () => {
+        ctx.inputStream = "debugger";
+        query({ ctx });
+        expect(console.log).toHaveBeenCalledTimes(3);
+    });
+
+    test("'debugger", () => {
+        ctx.inputStream = "'debugger";
+        query({ ctx });
+        expect(console.log).toHaveBeenCalledTimes(3);
     });
 });
 
 describe("Core - errors", () => {
     let ctx: Context;
+    const consoleError = console.error;
+    const consoleLog = console.log;
     beforeEach(() => {
         ctx = newCtx();
+
+        console.error = mock();
+        console.log = mock();
+    });
+    afterEach(() => {
+        console.error = consoleError;
+        console.log = consoleLog;
     });
 
     test("throwNewError", () => {
