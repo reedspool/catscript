@@ -1156,7 +1156,7 @@ define({
 define({
     name: "clone",
     impl: ({ ctx }) => {
-        const array = ctx.pop()! as Array<unknown>;
+        const array = ctx.pop() as Array<unknown>;
         const clone = [...array];
         ctx.push(clone);
     },

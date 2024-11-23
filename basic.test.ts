@@ -295,6 +295,16 @@ describe("Core - Synchronous", () => {
         resultantStack: [3, 5],
     };
 
+    tests["foreach"] = {
+        input: "[] dup 3 push dup 5 push dup 7 push 0 swap : addall foreach I + endforeach ; addall",
+        resultantStack: [15],
+    };
+
+    tests["foreach - exiting out"] = {
+        input: "[] dup 3 push dup 5 push dup 7 push 0 swap : addall foreach I + dup 7 > if exit endif endforeach ; addall",
+        resultantStack: [8],
+    };
+
     Object.entries(tests).forEach(([key, { input, resultantStack }]) => {
         test(key, async () => {
             ctx.inputStream = input;
