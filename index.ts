@@ -1178,11 +1178,11 @@ define({
 
 // Loop over an array, pushing interstitial values to the return stack
 define({
-    name: "foreach",
+    name: "each",
     isImmediate: true,
     impl: ({ ctx }) => {
         if (!ctx.compilationTarget) {
-            throw new Error("Can't use foreach outside of compilation");
+            throw new Error("Can't use each outside of compilation");
         }
         ctx.compilationTarget!.compiled!.push(coreWordImpl("clone"));
         ctx.compilationTarget!.compiled!.push(coreWordImpl(">control"));
@@ -1233,7 +1233,7 @@ define({
 });
 
 define({
-    name: "endforeach",
+    name: "endeach",
     isImmediate: true,
     impl: ({ ctx }) => {
         coreWordImpl("here")({ ctx });

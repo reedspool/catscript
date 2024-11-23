@@ -295,13 +295,13 @@ describe("Core - Synchronous", () => {
         resultantStack: [3, 5],
     };
 
-    tests["foreach"] = {
-        input: "[] dup 3 push dup 5 push dup 7 push 0 swap : addall foreach I + endforeach ; addall",
+    tests["each"] = {
+        input: "[] dup 3 push dup 5 push dup 7 push 0 swap : addall each I + endeach ; addall",
         resultantStack: [15],
     };
 
-    tests["foreach - exiting out"] = {
-        input: "[] dup 3 push dup 5 push dup 7 push 0 swap : addall foreach I + dup 7 > if exit endif endforeach ; addall",
+    tests["each - exiting out"] = {
+        input: "[] dup 3 push dup 5 push dup 7 push 0 swap : addall each I + dup 7 > if exit endif endeach ; addall",
         resultantStack: [8],
     };
 
@@ -466,10 +466,10 @@ describe("Core - errors", () => {
         );
     });
 
-    test("Incorrect usage of foreach", () => {
-        ctx.inputStream = "foreach";
+    test("Incorrect usage of each", () => {
+        ctx.inputStream = "each";
         expect(() => query({ ctx })).toThrowError(
-            "Can't use foreach outside of compilation",
+            "Can't use each outside of compilation",
         );
     });
 });
