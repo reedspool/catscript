@@ -1119,6 +1119,18 @@ define({
 });
 
 define({
+    name: "collect",
+    impl: ({ ctx }) => {
+        const [n] = [ctx.pop() as number];
+        const array: unknown[] = [];
+        for (let i = 0; i < n; i++) {
+            array.unshift(ctx.pop());
+        }
+        ctx.push(array);
+    },
+});
+
+define({
     name: "pop",
     impl: ({ ctx }) => {
         const [array] = [ctx.pop() as Array<unknown>];

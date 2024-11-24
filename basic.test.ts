@@ -275,6 +275,11 @@ describe("Core - Synchronous", () => {
         resultantStack: [[0]],
     };
 
+    tests["collect"] = {
+        input: "1 2 4 5 4 collect",
+        resultantStack: [[1, 2, 4, 5]],
+    };
+
     tests["pop"] = {
         input: "[] dup 0 push dup 1 push dup pop",
         resultantStack: [[0], 1],
