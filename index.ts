@@ -830,6 +830,28 @@ define({
     },
 });
 
+define({
+    name: "wordToFunc:",
+    impl({ ctx }) {
+        coreWordImpl("word")({ ctx });
+        coreWordImpl("find")({ ctx });
+        const dictionaryEntry = ctx.pop() as Dictionary | undefined;
+        if (!dictionaryEntry) {
+            throw new Error(`Couldn't find dictionary entry for wordToFunc:`);
+        }
+        ctx.push(() => {
+            const ctx = newCtx();
+            ctx.returnStack.push({
+                dictionaryEntry,
+                i: 0,
+                prevInterpreter: ctx.interpreter,
+            });
+            query({ ctx });
+            if (ctx.parameterStack.length > 0) return ctx.pop();
+        });
+    },
+});
+
 export function findDictionaryEntry({
     word,
     ctx,

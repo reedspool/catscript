@@ -357,6 +357,32 @@ describe("Core - Asynchronous", () => {
     });
 });
 
+describe("Core - JavaScript", () => {
+    let ctx: Context;
+    beforeEach(() => {
+        ctx = newCtx();
+    });
+    test("wordToFunc:", () => {
+        ctx.inputStream = ": addSome 40 2 + ; wordToFunc: addSome";
+        query({ ctx });
+        expect(ctx.parameterStack).toHaveLength(1);
+        expect(typeof ctx.parameterStack[0]).toBe("function");
+        const func = ctx.parameterStack[0];
+        if (typeof func != "function") throw new Error("Expected a function");
+        expect(func()).toEqual(42);
+    });
+
+    test("wordToFunc: with no return", () => {
+        ctx.inputStream = ": nothing ; wordToFunc: nothing";
+        query({ ctx });
+        expect(ctx.parameterStack).toHaveLength(1);
+        expect(typeof ctx.parameterStack[0]).toBe("function");
+        const func = ctx.parameterStack[0];
+        if (typeof func != "function") throw new Error("Expected a function");
+        expect(func()).toEqual(undefined);
+    });
+});
+
 describe("Core - mocked", () => {
     let ctx: Context;
     const consoleLog = console.log;
