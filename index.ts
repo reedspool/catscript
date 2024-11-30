@@ -1153,6 +1153,27 @@ define({
 });
 
 define({
+    name: "[",
+    impl: ({ ctx }) => {
+        const a = { __marker: true };
+        ctx.push(a);
+    },
+});
+
+define({
+    name: "]",
+    impl: ({ ctx }) => {
+        const array = [];
+        while (!(ctx.peek() as any).__marker) {
+            array.unshift(ctx.pop());
+        }
+
+        ctx.pop(); // Ditch the marker
+        ctx.push(array);
+    },
+});
+
+define({
     name: "pop",
     impl: ({ ctx }) => {
         const [array] = [ctx.pop() as Array<unknown>];
