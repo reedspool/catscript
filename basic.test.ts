@@ -245,9 +245,14 @@ describe("Core - Synchronous", () => {
         resultantStack: ["tempWord"],
     };
 
-    tests["variable"] = {
-        input: "variable varz 5 varz ! varz @",
+    tests["var:"] = {
+        input: "var: varz 5 varz ! varz @",
         resultantStack: [5],
+    };
+
+    tests["const:"] = {
+        input: "42 const: answer answer",
+        resultantStack: [42],
     };
 
     tests["globalThis"] = {

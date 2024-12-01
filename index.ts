@@ -624,7 +624,7 @@ define({
 });
 
 define({
-    name: "variable",
+    name: "var:",
     impl: ({ ctx }) => {
         coreWordImpl("word")({ ctx });
         const name = ctx.pop() as string;
@@ -672,6 +672,23 @@ define({
         if (!a.getter || typeof a.getter !== "function")
             throw new Error("Can only use word '@' on a variable");
         ctx.push(a.getter());
+    },
+});
+
+define({
+    name: "const:",
+    impl: ({ ctx }) => {
+        // This variable is actually going to be the
+        // value of the variable, via JavaScript closures
+        const value = ctx.pop() as unknown;
+        coreWordImpl("word")({ ctx });
+        const name = ctx.pop() as string;
+        define({
+            name,
+            impl: ({ ctx }) => {
+                ctx.push(value);
+            },
+        });
     },
 });
 
