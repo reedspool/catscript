@@ -869,6 +869,38 @@ define({
     },
 });
 
+define({
+    name: ".apply:",
+    isImmediate: true,
+    impl({ ctx }) {
+        // TODO: See note in definition of "'" about the state of the interpreter
+        if (ctx.interpreter === "compileWord") {
+            coreWordImpl("word")({ ctx });
+            const fnName = ctx.pop() as string;
+
+            const impl: Dictionary["impl"] = ({ ctx }) => {
+                const [obj, args] = [
+                    ctx.pop() as unknown,
+                    ctx.pop() as Array<unknown>,
+                ];
+                const fn = (obj as Record<typeof fnName, Function>)[fnName!];
+                ctx.push(fn.apply(obj, args));
+            };
+            ctx.compilationTarget!.compiled!.push(impl);
+        } else {
+            const [args, obj] = [
+                ctx.pop() as Array<unknown>,
+                ctx.pop() as unknown,
+            ];
+            coreWordImpl("word")({ ctx });
+            const fnName = ctx.pop() as string;
+            const fn = (obj as Record<typeof fnName, Function>)[fnName!];
+
+            ctx.push(fn.apply(obj, args));
+        }
+    },
+});
+
 export function findDictionaryEntry({
     word,
     ctx,

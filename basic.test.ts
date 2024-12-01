@@ -377,6 +377,20 @@ describe("Core - JavaScript", () => {
     beforeEach(() => {
         ctx = newCtx();
     });
+    test(".apply:", () => {
+        ctx.inputStream = "C . obj [] .apply: func ";
+        const ctxWithObj = ctx as unknown as { obj: { func: Function } };
+        ctxWithObj.obj = {
+            func: mock(function (this: (typeof ctxWithObj)["obj"]) {
+                return this;
+            }),
+        };
+        query({ ctx });
+        expect(ctx.parameterStack).toHaveLength(1);
+        expect(ctx.parameterStack[0]).toBe(ctxWithObj.obj);
+        expect(ctxWithObj.obj.func).toHaveBeenCalledTimes(1);
+    });
+
     test("wordToFunc:", () => {
         ctx.inputStream = ": addSome 40 2 + ; wordToFunc: addSome";
         query({ ctx });
