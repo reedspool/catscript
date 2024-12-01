@@ -134,7 +134,8 @@ export function load() {
                 },
             };
 
-            (ctx.me as Element).addEventListener(event, ({ target }) => {
+            (ctx.me as Element).addEventListener(event, (event) => {
+                const { target } = event;
                 // When the event occurs, we will run an independent interpreter (new ctx)
                 // with this anonymous dictionary entry already on the return stack. This
                 // is almost exactly as if this were a colon definition named `x` and then
@@ -143,6 +144,7 @@ export function load() {
                     ctx: {
                         ...newCtx(),
                         me: target,
+                        parameterStack: [event],
                         returnStack: [
                             {
                                 dictionaryEntry,
