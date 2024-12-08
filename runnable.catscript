@@ -1,0 +1,2 @@
+( Run with `bun ./runner.ts -f runnable.catscript` )
+' I am alive!' log
