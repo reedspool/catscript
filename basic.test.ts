@@ -383,7 +383,7 @@ describe("Core - JavaScript", () => {
         ctx = newCtx();
     });
     test(".apply:", () => {
-        ctx.inputStream = "C . obj [] .apply: func ";
+        ctx.inputStream = "[ 3 4 ] C . obj .apply: func ";
         const ctxWithObj = ctx as unknown as { obj: { func: Function } };
         ctxWithObj.obj = {
             func: mock(function (this: (typeof ctxWithObj)["obj"]) {
@@ -394,6 +394,38 @@ describe("Core - JavaScript", () => {
         expect(ctx.parameterStack).toHaveLength(1);
         expect(ctx.parameterStack[0]).toBe(ctxWithObj.obj);
         expect(ctxWithObj.obj.func).toHaveBeenCalledTimes(1);
+        expect(ctxWithObj.obj.func).toHaveBeenCalledWith(3, 4);
+    });
+
+    test(".apply: in definition", () => {
+        ctx.inputStream = ": apply [ 32 43 ] C . obj .apply: func ; apply";
+        const ctxWithObj = ctx as unknown as { obj: { func: Function } };
+        ctxWithObj.obj = {
+            func: mock(function (this: (typeof ctxWithObj)["obj"]) {
+                return this;
+            }),
+        };
+        query({ ctx });
+        expect(ctx.parameterStack).toHaveLength(1);
+        expect(ctx.parameterStack[0]).toBe(ctxWithObj.obj);
+        expect(ctxWithObj.obj.func).toHaveBeenCalledTimes(1);
+        expect(ctxWithObj.obj.func).toHaveBeenCalledWith(32, 43);
+    });
+
+    test(".apply: in definition reading the word later", () => {
+        ctx.inputStream =
+            ": apply: C . obj postpone .apply: ; : other ; [ 55 66 ] apply: func";
+        const ctxWithObj = ctx as unknown as { obj: { func: Function } };
+        ctxWithObj.obj = {
+            func: mock(function (this: (typeof ctxWithObj)["obj"]) {
+                return this;
+            }),
+        };
+        query({ ctx });
+        expect(ctx.parameterStack).toHaveLength(1);
+        expect(ctx.parameterStack[0]).toBe(ctxWithObj.obj);
+        expect(ctxWithObj.obj.func).toHaveBeenCalledTimes(1);
+        expect(ctxWithObj.obj.func).toHaveBeenCalledWith(55, 66);
     });
 
     test("wordToFunc:", () => {
