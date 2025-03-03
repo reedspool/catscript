@@ -1202,6 +1202,14 @@ define({
 });
 
 define({
+    name: "spread",
+    impl: ({ ctx }) => {
+        const [array] = [ctx.pop() as unknown[]];
+        ctx.push(...array);
+    },
+});
+
+define({
     name: "[",
     impl: ({ ctx }) => {
         const a = { __marker: true };

@@ -285,28 +285,33 @@ describe("Core - Synchronous", () => {
         resultantStack: [[1, 2, 4, 5]],
     };
 
-    tests["[ 1 2 3 ]"] = {
+    tests["array literal"] = {
         input: "[ 5 42 2 ]",
         resultantStack: [[5, 42, 2]],
     };
 
-    tests["[ [ 1 2 ] 3 ]"] = {
+    tests["array literal nested"] = {
         input: "[ [ 5 42 ] 2 ]",
         resultantStack: [[[5, 42], 2]],
     };
 
+    tests["spread"] = {
+        input: "[ [ 5 42 ] 2 ] spread",
+        resultantStack: [[5, 42], 2],
+    };
+
     tests["pop"] = {
-        input: "[] dup 0 push dup 1 push dup pop",
+        input: "[ 0 1 ] dup pop",
         resultantStack: [[0], 1],
     };
 
     tests["nth"] = {
-        input: "[] dup 3 push dup 4 push dup 5 push dup 1 nth",
+        input: "[ 3 4 5 ] dup 1 nth",
         resultantStack: [[3, 4, 5], 4],
     };
 
     tests["clone"] = {
-        input: "[] dup 3 push dup 4 push dup 5 push dup clone dup pop drop dup pop drop",
+        input: "[ 3 4 5 ] dup clone dup pop drop dup pop drop",
         resultantStack: [[3, 4, 5], [3]],
     };
 
@@ -316,7 +321,7 @@ describe("Core - Synchronous", () => {
     };
 
     tests["each"] = {
-        input: "[] dup 3 push dup 5 push dup 7 push 0 swap : addall each I + endeach ; addall",
+        input: "0 [ 3 5 7 ] : addall each I + endeach ; addall",
         resultantStack: [15],
     };
 
