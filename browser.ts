@@ -7,12 +7,23 @@ import {
     type Dictionary,
 } from "./index";
 
+// Only exported to be tested. Hope to get rid of this.
+export function uncallableDictionaryImplementation(this: Dictionary) {
+    throw new Error(`Uncallable dictionary entry '${this.name}' called`);
+}
+
 /**
  * Web/browser specific things
  */
 // Put the text (second in the parameter stack) into the innerText of the element
 // (first in the parameter stack)
 export function load() {
+    define({
+        name: "document",
+        impl: ({ ctx }) => {
+            ctx.push(document);
+        },
+    });
     define({
         name: ">text",
         impl: ({ ctx }) => {
@@ -86,7 +97,10 @@ export function load() {
                 ctx.compilationTarget!.compiled!.push(coreWordImpl("lit"));
                 ctx.compilationTarget!.compiled!.push(selector);
                 ctx.compilationTarget!.compiled!.push(coreWordImpl("swap"));
-                ctx.compilationTarget!.compiled!.push(coreWordImpl("select"));
+                ctx.push("select");
+                coreWordImpl("find")({ ctx });
+                const dictionaryEntry = ctx.pop() as Dictionary;
+                ctx.compilationTarget!.compiled!.push(dictionaryEntry.impl);
             } else {
                 const element = ctx.pop();
                 // Move cursor past the single blank space between
@@ -109,7 +123,7 @@ export function load() {
         name: "on",
         impl: ({ ctx }) => {
             coreWordImpl("word")({ ctx });
-            const event = ctx.pop() as string;
+            const eventName = ctx.pop() as string;
 
             // By not using `define` we don't adjust the dictionary pointer `latest`.
             // This is a divergence from Forth implementations I've seen, and I'm calling
@@ -124,17 +138,13 @@ export function load() {
             //       just be getting compiled into a colon definiton AND ALSO getting
             //       executed until the instruction pointer goes to the end?
             const dictionaryEntry: Dictionary = {
-                name: `anonymous-on-${event}-handler`,
+                name: `anonymous-on-${eventName}-handler`,
                 previous: null,
                 compiled: [],
-                impl() {
-                    throw new Error(
-                        `Uncallable dictionary entry ${this.name} called`,
-                    );
-                },
+                impl: uncallableDictionaryImplementation,
             };
 
-            (ctx.me as Element).addEventListener(event, (event) => {
+            (ctx.me as Element).addEventListener(eventName, (event) => {
                 const { target } = event;
                 // When the event occurs, we will run an independent interpreter (new ctx)
                 // with this anonymous dictionary entry already on the return stack. This
@@ -165,7 +175,7 @@ export function load() {
     define({
         name: "addEventListener",
         impl: ({ ctx }) => {
-            const [event, impl, target] = [
+            const [eventName, impl, target] = [
                 ctx.pop() as string,
                 ctx.pop() as Dictionary["impl"],
                 ctx.pop() as Element,
@@ -184,17 +194,13 @@ export function load() {
             //       just be getting compiled into a colon definiton AND ALSO getting
             //       executed until the instruction pointer goes to the end?
             const dictionaryEntry: Dictionary = {
-                name: `anonymous-on-${event}-handler`,
+                name: `anonymous-addEventListener-${eventName}-handler`,
                 previous: null,
                 compiled: [impl],
-                impl() {
-                    throw new Error(
-                        `Uncallable dictionary entry ${this.name} called`,
-                    );
-                },
+                impl: uncallableDictionaryImplementation,
             };
 
-            target.addEventListener(event, ({ target }) => {
+            target.addEventListener(eventName, ({ target }) => {
                 // When the event occurs, we will run an independent interpreter (new ctx)
                 // with this anonymous dictionary entry already on the return stack. This
                 // is almost exactly as if this were a colon definition named `x` and then
@@ -226,7 +232,6 @@ export function load() {
         var results = root.querySelectorAll(match);
         for (var i = 0; i < results.length; i++) {
             var elt = results[i];
-            if (!elt) return;
             if (
                 elt.compareDocumentPosition(start) ===
                 Node.DOCUMENT_POSITION_PRECEDING
@@ -237,10 +242,9 @@ export function load() {
         if (wrap) {
             return results[0];
         }
-
-        return;
     };
 
+    // Stolen with love from Hyperscript https://hyperscript.org and converted to TS
     var scanBackwardsQuery = function (
         start: Node,
         root: Element | Document,
@@ -250,7 +254,6 @@ export function load() {
         var results = root.querySelectorAll(match);
         for (var i = results.length - 1; i >= 0; i--) {
             var elt = results[i];
-            if (!elt) return;
             if (
                 elt.compareDocumentPosition(start) ===
                 Node.DOCUMENT_POSITION_FOLLOWING
@@ -261,50 +264,6 @@ export function load() {
         if (wrap) {
             return results[results.length - 1];
         }
-
-        return;
-    };
-
-    var scanForwardArray = function (
-        start: unknown,
-        array: Array<Element>,
-        match: Parameters<typeof HTMLElement.prototype.matches>[0],
-        wrap?: Boolean,
-    ): Element | undefined {
-        var matches: Array<Element> = [];
-        array.forEach(function (elt) {
-            if (elt.matches(match) || elt === start) {
-                matches.push(elt);
-            }
-        });
-        for (var i = 0; i < matches.length - 1; i++) {
-            var elt = matches[i];
-            if (elt === start) {
-                return matches[i + 1];
-            }
-        }
-        if (wrap) {
-            var first = matches[0];
-            if (first && first.matches(match)) {
-                return first;
-            }
-        }
-
-        return;
-    };
-
-    var scanBackwardsArray = function (
-        start: unknown,
-        array: Array<Element>,
-        match: Parameters<typeof HTMLElement.prototype.matches>[0],
-        wrap?: Boolean,
-    ): Element | undefined {
-        return scanForwardArray(
-            start,
-            Array.from(array).reverse(),
-            match,
-            wrap,
-        );
     };
 
     define({
@@ -316,6 +275,23 @@ export function load() {
                 element as Element,
                 document,
                 selector!.toString(),
+                false,
+            );
+            ctx.push(result);
+        },
+    });
+
+    // I don't have a usecase for this and it's just here because the utility from Hyperscript came with this extra parameter and I'm doing it for coverage of the scanForwardQuery function. Probably more effective to make a test file just for the utility function
+    define({
+        name: "nextWrap",
+        impl: ({ ctx }) => {
+            const [element, selector] = [ctx.pop(), ctx.pop()];
+
+            const result = scanForwardQuery(
+                element as Element,
+                document,
+                selector!.toString(),
+                true,
             );
             ctx.push(result);
         },
@@ -330,6 +306,23 @@ export function load() {
                 element as Element,
                 document,
                 selector!.toString(),
+                false,
+            );
+            ctx.push(result);
+        },
+    });
+
+    // I don't have a usecase for this and it's just here because the utility from Hyperscript came with this extra parameter and I'm doing it for coverage of the scanForwardQuery function. Probably more effective to make a test file just for the utility function
+    define({
+        name: "previousWrap",
+        impl: ({ ctx }) => {
+            const [element, selector] = [ctx.pop(), ctx.pop()];
+
+            const result = scanBackwardsQuery(
+                element as Element,
+                document,
+                selector!.toString(),
+                true,
             );
             ctx.push(result);
         },
@@ -392,9 +385,12 @@ export function runAttributes() {
                 ctx,
             });
         } catch (error) {
-            console.error(`Error in script:\n\n"${inputStream}"`);
+            console.error((error as Error).message);
             console.error(error);
-            console.error("Context after error", ctx);
+            console.error(`Error in script:\n\n"${inputStream}"`);
+            // TODO: DO NOT TURN ON FOR TESTING. LOCALLY, THIS CAUSES
+            //       A HUGE DUMP TO CONSOLE.
+            // console.error("Context after error", ctx);
             console.error(
                 `Here is the input stream, with \`<--!-->\` marking the input stream pointer`,
             );
@@ -408,20 +404,20 @@ export function runAttributes() {
     });
 
     document.querySelectorAll("script[type*=catscript]").forEach((script) => {
-        const inputStream = script.textContent;
-        if (inputStream === null) {
-            console.warn("Skipping script with null textContent", script);
-            return;
-        }
+        // textContent can be null if we selected a document or doctype, not a script
+        const inputStream = script.textContent ?? "";
         const ctx = { ...newCtx(), me: script, inputStream };
         try {
             query({
                 ctx,
             });
         } catch (error) {
-            console.error(`Error in script:\n\n"${inputStream}"`);
+            console.error((error as Error).message);
             console.error(error);
-            console.error("Context after error", ctx);
+            console.error(`Error in script:\n\n"${inputStream}"`);
+            // TODO: DO NOT TURN ON FOR TESTING. LOCALLY, THIS CAUSES
+            //       A HUGE DUMP TO CONSOLE.
+            // console.error("Context after error", ctx);
             console.error(
                 `Here is the input stream, with \`<--!-->\` marking the input stream pointer`,
             );
