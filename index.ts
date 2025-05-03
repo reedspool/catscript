@@ -511,6 +511,7 @@ define({
         const dictionaryEntry = ctx.compilationTarget;
         if (!dictionaryEntry)
             throw new Error("Can't use `here` outside of a definition");
+        // TODO: Is this 0 hiding a bug? If there's no compiled array, what?
         const i = dictionaryEntry?.compiled?.length || 0;
         // This shape merges the "return stack frame" and the "variable" types to
         // refer to a location within a dictionary entry's "compiled" data. In Forth,
@@ -1298,23 +1299,11 @@ define({
         };
         ctx.compilationTarget!.compiled!.push(impl);
 
-        // TODO Jump beyond the "before every loop" chunk
-
         // Push to the param stack the location where we need to jump back before
         // every loop
         coreWordImpl("here")({ ctx });
-
-        // Aforementioned "every loop" stuff
-        const impl2: Dictionary["impl"] = ({ ctx }) => {
-            ctx.controlStack.pop();
-            const lastIndex = ctx.controlStack.pop() as number;
-            const index = lastIndex + 1;
-            const array = ctx.controlStack.pop() as Array<unknown>;
-            ctx.controlStack.push(array);
-            ctx.controlStack.push(index);
-            ctx.controlStack.push(array[index]);
-        };
-        ctx.compilationTarget!.compiled!.push(impl2);
+        // TODO: Why do we need an empty cell here? Off-by-one with the jumping back index?
+        ctx.compilationTarget!.compiled!.push(null);
     },
 });
 

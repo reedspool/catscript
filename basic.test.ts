@@ -197,8 +197,13 @@ describe("Core - Synchronous", () => {
         resultantStack: [true],
     };
 
-    tests["match regular expressions"] = {
+    tests["regular expressions and match"] = {
         input: "re/ e\\\\d+/ ' te123st' match first ' e123' ===",
+        resultantStack: [true],
+    };
+
+    tests["regular expressions and match within : definition"] = {
+        input: ": matchy re/ e\\\\d+/ swap match first ' e123' === ; ' te123st'  matchy",
         resultantStack: [true],
     };
 
@@ -318,7 +323,7 @@ describe("Core - Synchronous", () => {
     };
 
     tests["each - exiting out"] = {
-        input: "[] dup 3 push dup 5 push dup 7 push 0 swap : addall each I + dup 7 > if exit endif endeach ; addall",
+        input: "0 [ 3 5 7 ] : addall each I + dup 7 > if exit endif endeach ; addall",
         resultantStack: [8],
     };
 
