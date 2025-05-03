@@ -1,13 +1,5 @@
 import { newCtx, query, type Context } from "./index";
-import {
-    expect,
-    test,
-    describe,
-    beforeEach,
-    afterEach,
-    spyOn,
-    mock,
-} from "bun:test";
+import { expect, test, describe, beforeEach, afterEach, mock } from "bun:test";
 
 type MyTests = Record<
     string,
@@ -340,7 +332,7 @@ describe("Core - Synchronous", () => {
             // Even though these are synchronous, the promise should still resolve
             // in the next event loop step. At time of writing, Bun crashes on this
             // test if the promise never resolves.
-            await expect(ctx.haltedPromise).resolves.toBeUndefined();
+            expect(ctx.haltedPromise).resolves.toBeUndefined();
         });
     });
 });
@@ -372,7 +364,7 @@ describe("Core - Asynchronous", () => {
             // Even though these are synchronous, the promise should still resolve
             // in the next event loop step. At time of writing, Bun crashes on this
             // test if the promise never resolves.
-            await expect(ctx.haltedPromise).resolves.toBeUndefined();
+            expect(ctx.haltedPromise).resolves.toBeUndefined();
         });
     });
 });
