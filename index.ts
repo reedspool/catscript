@@ -27,8 +27,8 @@ export type Context = {
     inputStream: string;
     paused: boolean;
     halted: boolean;
+    halt: () => Promise<void>;
     haltedPromise: Promise<unknown>;
-    resolveHaltedPromise: (value: unknown) => void;
     inputStreamPointer: number;
     interpreter: "queryWord" | "compileWord";
     pop: () => Context["parameterStack"][0];
@@ -39,15 +39,8 @@ export type Context = {
     emit: typeof console.log;
 };
 export const newCtx: () => Context = () => {
-    let resolveHaltedPromise: (value: unknown) => void = () => {
-        throw new Error(
-            `This should never be called, because the real resolver should be
-            supplied. This function only exists because TypeScript doesn't
-            believe that the other one will be set in time. I wonder if there's
-            a canonical way to do this sort of thing.`,
-        );
-    };
-    const haltedPromise = new Promise(
+    let resolveHaltedPromise: () => void;
+    const haltedPromise = new Promise<void>(
         (resolve) => (resolveHaltedPromise = resolve),
     );
     return {
@@ -59,7 +52,11 @@ export const newCtx: () => Context = () => {
         paused: false,
         halted: false,
         haltedPromise,
-        resolveHaltedPromise,
+        halt() {
+            this.halted = true;
+            resolveHaltedPromise();
+            return haltedPromise;
+        },
         inputStreamPointer: 0,
         interpreter: "queryWord",
         compilationTarget: null,
@@ -317,8 +314,7 @@ define({
 
         if (ctx.inputStreamPointer >= ctx.inputStream.length) {
             // No input left to process
-            ctx.halted = true;
-            ctx.resolveHaltedPromise(undefined);
+            ctx.halt();
             return;
         }
 
