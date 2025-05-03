@@ -417,10 +417,8 @@ define({
     impl: ({ ctx }) => {
         coreWordImpl("word")({ ctx });
         coreWordImpl("find")({ ctx });
-        const dictionaryEntry = ctx.pop() as Dictionary | undefined;
-        if (!dictionaryEntry) {
-            throw new Error(`Couldn't find dictionary entry to POSTPONE`);
-        }
+        const dictionaryEntry = ctx.pop() as Dictionary;
+
         // This replicates a lot of the logic structure from compileWord,
         // except it compiles the "compile time" semantics, i.e. it never
         // executes immediate words, just compiles them, and for non-immediate
@@ -848,10 +846,7 @@ define({
     impl({ ctx }) {
         coreWordImpl("word")({ ctx });
         coreWordImpl("find")({ ctx });
-        const dictionaryEntry = ctx.pop() as Dictionary | undefined;
-        if (!dictionaryEntry) {
-            throw new Error(`Couldn't find dictionary entry for wordToFunc:`);
-        }
+        const dictionaryEntry = ctx.pop() as Dictionary;
         ctx.push(() => {
             const ctx = newCtx();
             ctx.returnStack.push({
