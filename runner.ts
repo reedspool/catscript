@@ -21,7 +21,7 @@ const { values, positionals } = parseArgs({
 });
 
 const { file } = values;
-const script = await Bun.file(file).text();
+const script = await Bun.file(file!).text();
 const ctx = newCtx();
 ctx.inputStream = script;
 query({ ctx });

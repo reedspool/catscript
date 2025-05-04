@@ -5,18 +5,12 @@ import {
     coreWordImpl,
     consume,
     type Dictionary,
+    uncallableDictionaryImplementation,
 } from "./index";
-
-// Only exported to be tested. Hope to get rid of this.
-export function uncallableDictionaryImplementation(this: Dictionary) {
-    throw new Error(`Uncallable dictionary entry '${this.name}' called`);
-}
 
 /**
  * Web/browser specific things
  */
-// Put the text (second in the parameter stack) into the innerText of the element
-// (first in the parameter stack)
 export function load() {
     define({
         name: "document",
@@ -24,6 +18,8 @@ export function load() {
             ctx.push(document);
         },
     });
+    // Put the text (second in the parameter stack) into the innerText of the
+    // element (first in the parameter stack)
     define({
         name: ">text",
         impl: ({ ctx }) => {
@@ -89,30 +85,16 @@ export function load() {
         name: "select'",
         isImmediate: true,
         impl: ({ ctx }) => {
-            // TODO: See note in definition of "'" about the state of the interpreter
-            if (ctx.interpreter === "compileWord") {
-                // Move cursor past the single blank space between
-                ctx.inputStreamPointer++;
-                const selector = consume({ until: "'", including: true, ctx });
-                ctx.compilationTarget!.compiled!.push(coreWordImpl("lit"));
-                ctx.compilationTarget!.compiled!.push(selector);
-                ctx.compilationTarget!.compiled!.push(coreWordImpl("swap"));
-                ctx.push("select");
-                coreWordImpl("find")({ ctx });
-                const dictionaryEntry = ctx.pop() as Dictionary;
-                ctx.compilationTarget!.compiled!.push(dictionaryEntry.impl);
-            } else {
-                const element = ctx.pop();
-                // Move cursor past the single blank space between
-                ctx.inputStreamPointer++;
-                const selector = consume({ until: "'", including: true, ctx });
-                ctx.push(selector);
-                ctx.push(element);
-                ctx.push("select");
-                coreWordImpl("find")({ ctx });
-                const dictionaryEntry = ctx.pop() as Dictionary;
-                dictionaryEntry.impl({ ctx });
-            }
+            // Move cursor past the single blank space between
+            ctx.inputStreamPointer++;
+            const selector = consume({ until: "'", including: true, ctx });
+            ctx.compilationTarget!.compiled!.push(coreWordImpl("lit"));
+            ctx.compilationTarget!.compiled!.push(selector);
+            ctx.compilationTarget!.compiled!.push(coreWordImpl("swap"));
+            ctx.push("select");
+            coreWordImpl("find")({ ctx });
+            const dictionaryEntry = ctx.pop() as Dictionary;
+            ctx.compilationTarget!.compiled!.push(dictionaryEntry.impl);
         },
     });
 
@@ -121,6 +103,7 @@ export function load() {
     // Usage: `<a c="on click ' It worked!' me >text ;">`
     define({
         name: "on",
+        isImmediate: true,
         impl: ({ ctx }) => {
             coreWordImpl("word")({ ctx });
             const eventName = ctx.pop() as string;
@@ -159,14 +142,15 @@ export function load() {
                             {
                                 dictionaryEntry,
                                 i: 0,
-                                prevInterpreter: "queryWord", // Unused, I believe
                             },
                         ],
                     },
                 });
             });
 
-            ctx.interpreter = "compileWord";
+            ctx.interpreterStack.push({
+                prevCompilationTarget: ctx.compilationTarget,
+            });
             // Compile all words into this anonymous entry until `;`
             ctx.compilationTarget = dictionaryEntry;
         },
@@ -213,7 +197,6 @@ export function load() {
                             {
                                 dictionaryEntry,
                                 i: 0,
-                                prevInterpreter: "queryWord", // Unused, I believe
                             },
                         ],
                     },

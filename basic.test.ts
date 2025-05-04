@@ -1,4 +1,11 @@
-import { newCtx, query, type Context } from "./index";
+import {
+    newCtx,
+    query,
+    type Context,
+    type Dictionary,
+    define,
+    uncallableDictionaryImplementation,
+} from "./index";
 import { expect, test, describe, beforeEach, afterEach, mock } from "bun:test";
 
 type MyTests = Record<
@@ -8,6 +15,19 @@ type MyTests = Record<
         resultantStack: Context["parameterStack"];
     }
 >;
+describe("Test utility", () => {
+    test("uncallableDictionaryImplementation", () => {
+        const name = "ANONYMOUS";
+        const dictionaryEntry: Dictionary = define({
+            name,
+            impl: uncallableDictionaryImplementation,
+        });
+
+        expect(() => dictionaryEntry.impl({ ctx: newCtx() })).toThrowError(
+            `Uncallable dictionary entry '${name}' called`,
+        );
+    });
+});
 describe("Core - Synchronous", () => {
     let ctx: Context;
     const tests: MyTests = {};
@@ -142,58 +162,126 @@ describe("Core - Synchronous", () => {
         resultantStack: [true, true],
     };
 
+    tests["here immediately & -stackFrame outside `:` definition"] = {
+        input: ": hereNow immediate here ; hereNow false drop hereNow -stackFrame ",
+        resultantStack: [-3],
+    };
+
+    tests["here immediately & -stackFrame within `:` definition"] = {
+        input: ": hereNow immediate here ; : def hereNow false drop hereNow -stackFrame ; def",
+        resultantStack: [-3],
+    };
+
     tests["branch"] = {
-        input: ": 3, immediate 3 , ; : branchy true branch 3, ' ❌1' ' ❌2' drop ; branchy ",
+        // Note the calculation has to account for the `lit` in front of each
+        // string value, and the indexing begins after the `branch` call, on
+        // the one compiled item from `compileNow: 5`
+        input: "true branch compileNow: 5 ' ❌1' ' ❌2' true false drop ",
+        resultantStack: [true, true],
+    };
+
+    tests["branch within `:`"] = {
+        input: "false drop : 3, immediate 3 , ; : branchy true branch 3, ' ❌1' ' ❌2' drop ; branchy ",
         resultantStack: [true],
     };
 
     tests["0 0branch"] = {
-        input: ": branchy true 0 0branch 3, ' ❌1' ' ❌2' drop ; branchy",
+        input: "true 0 0branch compileNow: 5 ' ❌1' ' ❌2' true false drop",
+        resultantStack: [true, true],
+    };
+
+    tests["0 0branch within `:`"] = {
+        input: "false drop : branchy true 0 0branch 3, ' ❌1' ' ❌2' drop ; branchy",
         resultantStack: [true],
     };
 
     tests["1 0branch"] = {
-        input: ": 4, immediate 4 , ; : branchy ' ❌1' 1 0branch 4, drop true ' ❌2' drop ; branchy",
+        input: "true 1 0branch compileNow: 1 drop true ' ❌2' drop ",
+        resultantStack: [true],
+    };
+
+    tests["1 0branch within `:`"] = {
+        input: "false drop : 4, immediate 4 , ; : branchy ' ❌1' 1 0branch 4, drop true ' ❌2' drop ; branchy",
         resultantStack: [true],
     };
 
     tests["Falsy falsyBranch"] = {
-        input: ": branchy true false falsyBranch 3, ' ❌1' ; branchy",
+        input: "true false falsyBranch compileNow: 3 ' ❌1' true false drop",
+        resultantStack: [true, true],
+    };
+
+    tests["Falsy falsyBranch within `:`"] = {
+        input: "false drop : branchy true false falsyBranch 3, ' ❌1' ; branchy",
         resultantStack: [true],
     };
 
     tests["Truthy falsyBranch"] = {
-        input: ": branchy ' ❌1' true falsyBranch 3, drop true ; branchy",
+        input: "' ❌1' true falsyBranch 3, drop true ",
+        resultantStack: [true],
+    };
+
+    tests["Truthy falsyBranch within `:`"] = {
+        input: "false drop : branchy ' ❌1' true falsyBranch 3, drop true ; branchy",
         resultantStack: [true],
     };
 
     tests["true if"] = {
-        input: ": iffy ' ❌' true if drop true endif ; iffy",
+        input: "' ❌' true if drop true endif false drop",
+        resultantStack: [true],
+    };
+
+    tests["true if within `:`"] = {
+        input: "false drop : iffy ' ❌' true if drop true endif ; iffy",
         resultantStack: [true],
     };
 
     tests["false if"] = {
-        input: ": iffy true false if ' ❌' endif ; iffy",
+        input: "true false if ' ❌' endif false drop",
+        resultantStack: [true],
+    };
+
+    tests["false if within `:`"] = {
+        input: "false drop : iffy true false if ' ❌' endif ; iffy",
         resultantStack: [true],
     };
 
     tests["true if/else"] = {
-        input: ": iffy true if true else ' ❌' endif ; iffy",
+        input: "true if true else ' ❌' endif false drop",
+        resultantStack: [true],
+    };
+
+    tests["true if/else within `:`"] = {
+        input: "false drop : iffy true if true else ' ❌' endif ; iffy",
         resultantStack: [true],
     };
 
     tests["false if/else"] = {
-        input: ": iffy false if ' ❌' else true endif ; iffy",
+        input: "false if ' ❌' else true endif ",
+        resultantStack: [true],
+    };
+
+    tests["false if/else within `:`"] = {
+        input: "false drop : iffy false if ' ❌' else true endif ; iffy",
         resultantStack: [true],
     };
 
     tests["begin/until"] = {
-        input: ": countDown begin 1 - dup 1 < until ; 5 countDown 0 === true && ",
+        input: "5 begin 1 - dup 1 < until 0 === true && ",
+        resultantStack: [true],
+    };
+
+    tests["begin/until within `:`"] = {
+        input: "false drop : countDown begin 1 - dup 1 < until ; 5 countDown 0 === true && ",
         resultantStack: [true],
     };
 
     tests["( comments )"] = {
-        input: " : checky ( comment in definition ) true ; checky ( this is a comment, it can contain anything ✅ except a closing paren )",
+        input: "true ( this is a comment, it can contain anything ✅ except a closing paren ) true",
+        resultantStack: [true, true],
+    };
+
+    tests["( comments ) within `:`"] = {
+        input: " : checky ( comment in definition ) true ; checky",
         resultantStack: [true],
     };
 
@@ -223,13 +311,13 @@ describe("Core - Synchronous", () => {
     };
 
     tests[".! operator"] = {
-        input: "C . inputStream '  true' + C .! inputStream",
-        resultantStack: [true],
+        input: "5 {} dup -rot .! test",
+        resultantStack: [{ test: 5 }],
     };
 
     tests[".! operator in definition"] = {
-        input: ": def C . inputStream '  true' + C .! inputStream ; def",
-        resultantStack: [true],
+        input: ": def 6 {} dup -rot .! test2 ; def",
+        resultantStack: [{ test2: 6 }],
     };
 
     tests["quit"] = {
@@ -249,6 +337,11 @@ describe("Core - Synchronous", () => {
 
     tests["const:"] = {
         input: "42 const: answer answer",
+        resultantStack: [42],
+    };
+
+    tests["const: within `:`"] = {
+        input: "false drop : test 42 const: answer answer ; test",
         resultantStack: [42],
     };
 
@@ -409,22 +502,6 @@ describe("Core - JavaScript", () => {
         expect(ctxWithObj.obj.func).toHaveBeenCalledWith(32, 43);
     });
 
-    test(".apply: in definition reading the word later", () => {
-        ctx.inputStream =
-            ": apply: C . obj postpone .apply: ; : other ; [ 55 66 ] apply: func";
-        const ctxWithObj = ctx as unknown as { obj: { func: Function } };
-        ctxWithObj.obj = {
-            func: mock(function (this: (typeof ctxWithObj)["obj"]) {
-                return this;
-            }),
-        };
-        query({ ctx });
-        expect(ctx.parameterStack).toHaveLength(1);
-        expect(ctx.parameterStack[0]).toBe(ctxWithObj.obj);
-        expect(ctxWithObj.obj.func).toHaveBeenCalledTimes(1);
-        expect(ctxWithObj.obj.func).toHaveBeenCalledWith(55, 66);
-    });
-
     test("wordToFunc:", () => {
         ctx.inputStream = ": addSome 40 2 + ; wordToFunc: addSome";
         query({ ctx });
@@ -481,7 +558,7 @@ describe("Core - mocked", () => {
     test("'debugger", () => {
         ctx.inputStream = "'debugger";
         query({ ctx });
-        expect(console.log).toHaveBeenCalledTimes(3);
+        expect(console.log).toHaveBeenCalledTimes(2);
     });
 });
 
@@ -510,13 +587,6 @@ describe("Core - errors", () => {
         expect(() => query({ ctx })).toThrowError();
     });
 
-    test("Incorrect usage of here", () => {
-        ctx.inputStream = "here";
-        expect(() => query({ ctx })).toThrowError(
-            "Can't use `here` outside of a definition",
-        );
-    });
-
     test("Incorrect usage of -stackFrame", () => {
         ctx.inputStream = "5 5 -stackFrame";
         expect(() => query({ ctx })).toThrowError(
@@ -524,9 +594,9 @@ describe("Core - errors", () => {
         );
     });
 
-    test("Another incorrect usage of -stackFrame", () => {
+    test("A second incorrect usage of -stackFrame", () => {
         ctx.inputStream =
-            ": inner here ; immediate : outer1 inner ; outer1 : outer2 inner ; outer2 -stackFrame";
+            ": inner immediate here ; : outer1 inner ; outer1 : outer2 inner ; outer2 -stackFrame";
         expect(() => query({ ctx })).toThrowError(
             "`-stackFrame` across different dictionary entries not supported",
         );
@@ -563,7 +633,28 @@ describe("Core - errors", () => {
     test("Incorrect usage of each", () => {
         ctx.inputStream = "each";
         expect(() => query({ ctx })).toThrowError(
-            "Can't use each outside of compilation",
+            "`each` requires an array argument",
+        );
+    });
+
+    test("Incorrect usage of `;`", () => {
+        ctx.inputStream = ";";
+        expect(() => query({ ctx })).toThrowError(
+            "Interpreter stack underflow",
+        );
+    });
+
+    test("Incorrect usage of `compileNow:`", () => {
+        ctx.inputStream = "compileNow:";
+        expect(() => query({ ctx })).toThrowError(
+            "compileNow: must be followed by a primitive",
+        );
+    });
+
+    test("Incorrect usage of `clone`", () => {
+        ctx.inputStream = "5 clone";
+        expect(() => query({ ctx })).toThrowError(
+            "Attempted to clone a non-array argument",
         );
     });
 });

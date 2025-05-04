@@ -1,2 +1,6 @@
 ( Run with `bun ./runner.ts -f runnable.catscript` )
+( Or `bun --inspect-brk ./runner.ts -f runnable.catscript` and throw a debugger in )
 ' I am alive!' log
+'debugger
+: iffy ' ❌' true if drop true endif ; iffy
+C . parameterStack log

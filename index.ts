@@ -10,27 +10,28 @@ export type Dictionary = {
     name: string;
     previous: Dictionary | null;
     impl: ({ ctx }: { ctx: Context }) => void;
-    compiled?: (Dictionary["impl"] | unknown)[];
+    compiled: (Dictionary["impl"] | unknown)[];
     isImmediate?: boolean;
 };
-let latest: Dictionary | null = null;
+let latest: Dictionary;
 export type Context = {
     me: Element | unknown;
     parameterStack: unknown[];
     returnStack: {
         dictionaryEntry: Dictionary;
         i: number;
-        prevInterpreter: Context["interpreter"];
+    }[];
+    interpreterStack: {
+        prevCompilationTarget: Context["compilationTarget"];
     }[];
     controlStack: unknown[];
-    compilationTarget: Dictionary | null;
+    compilationTarget: Dictionary;
     inputStream: string;
     paused: boolean;
     halted: boolean;
     halt: () => Promise<void>;
     haltedPromise: Promise<unknown>;
     inputStreamPointer: number;
-    interpreter: "queryWord" | "compileWord";
     pop: () => Context["parameterStack"][0];
     push: (...args: Context["parameterStack"]) => void;
     peek: () => Context["parameterStack"][0];
@@ -38,15 +39,28 @@ export type Context = {
     advanceCurrentFrame: (value?: number) => void;
     emit: typeof console.log;
 };
+
+// Only exported to be tested. Hope to get rid of this.
+export function uncallableDictionaryImplementation(this: Dictionary) {
+    throw new Error(`Uncallable dictionary entry '${this.name}' called`);
+}
+
+let anonCount = 0;
 export const newCtx: () => Context = () => {
     let resolveHaltedPromise: () => void;
     const haltedPromise = new Promise<void>(
         (resolve) => (resolveHaltedPromise = resolve),
     );
+
+    const BASE = define({
+        name: `ANONYMOUS-${anonCount++}`,
+        impl: uncallableDictionaryImplementation,
+    });
     return {
         me: null,
         parameterStack: [],
         returnStack: [],
+        interpreterStack: [],
         controlStack: [],
         inputStream: "",
         paused: false,
@@ -58,8 +72,7 @@ export const newCtx: () => Context = () => {
             return haltedPromise;
         },
         inputStreamPointer: 0,
-        interpreter: "queryWord",
-        compilationTarget: null,
+        compilationTarget: BASE,
         pop() {
             if (this.parameterStack.length < 1)
                 throw new Error("Stack underflow");
@@ -86,7 +99,7 @@ export const newCtx: () => Context = () => {
         emit: (...args) => {
             console.log(...args);
         },
-    };
+    } satisfies Context;
 };
 
 // Jonesforth names all code (core) words with assembly labels so that other core
@@ -102,7 +115,7 @@ export function define({
     name,
     impl,
     isImmediate = false,
-}: Omit<Dictionary, "previous">) {
+}: Omit<Dictionary, "previous" | "compiled">): Dictionary {
     // TODO: Right now, there's only one global dictionary which is shared
     //       across all contexts. Considering how this might be isolated to
     //       a context object. Seems wasteful to copy "core" functions like those
@@ -113,13 +126,26 @@ export function define({
     // @ts-ignore Add debug info. How could we extend the type of our function to
     //            include this?
     impl.__debug__originalWord = name;
-    latest = { previous: latest, name, impl, isImmediate };
+    // TODO: Fix typescript later to allow no name instead and get rid of this special word
+    const dictionaryEntry: Dictionary = {
+        previous: latest,
+        name,
+        impl,
+        isImmediate,
+        compiled: [],
+    };
+    if (name.startsWith("ANONYMOUS")) {
+        // Don't actually set latest, or a core word, just give it back
+        return dictionaryEntry;
+    }
+    latest = dictionaryEntry;
     // TODO: When I looked at this, I had a thought about the above issue.
     if (!doneDefiningCoreWords) {
         if (name in coreWords)
             throw new Error(`Redefining core word '${name}'`);
         coreWords[name] = latest;
     }
+    return dictionaryEntry;
 }
 
 export function coreWordImpl(name: Dictionary["name"]) {
@@ -178,31 +204,11 @@ define({
     name: "'",
     isImmediate: true,
     impl: ({ ctx }) => {
-        // TODO: Switching on the state of the interpreter feels dirty, coupling the
-        //       implementation of this word to the implementation of the compiler,
-        //       which is at higher level of abstraction. However, that's exactly
-        //       how Jonesforth does it (though in Forth itself).
-        //       I'd still like to find a better way.
-        //       This is a clean branch, i.e. no shared code, and even if there
-        //       were shared code could copy that shared code if the following makes
-        //       sense. So, could it be two different words? Then the question is
-        //       how to find those two separate words in the dictionary. Maybe a
-        //       flag which makes a word invisible in compileWord mode, so that a
-        //       previous non-flagged version gets found in that mode? That doesn't
-        //       really solve the problem of attaching to the higher level of
-        //       abstraction, but it does move it into the `define` implementation
-        if (ctx.interpreter === "compileWord") {
-            // Move cursor past the single blank space between
-            ctx.inputStreamPointer++;
-            const text = consume({ until: "'", including: true, ctx });
-            ctx.compilationTarget!.compiled!.push(coreWordImpl("lit"));
-            ctx.compilationTarget!.compiled!.push(text);
-        } else {
-            // Move cursor past the single blank space between
-            ctx.inputStreamPointer++;
-            const text = consume({ until: "'", including: true, ctx });
-            ctx.push(text);
-        }
+        // Move cursor past the single blank space between
+        ctx.inputStreamPointer++;
+        const text = consume({ until: "'", including: true, ctx });
+        ctx.compilationTarget.compiled.push(coreWordImpl("lit"));
+        ctx.compilationTarget.compiled.push(text);
     },
 });
 
@@ -270,13 +276,18 @@ define({
     name: "quit",
     impl: ({ ctx }) => {
         // First, clear the return stack
-        ctx.returnStack.length = 0;
+        // TODO: This feels like absolute nonsense now. It used to be
+        // clearing the return stack completely, but now it's just
+        // clearing it almost arbitrarily to the first level.
+        ctx.returnStack.length = 1;
         coreWordImpl("interpret")({ ctx });
     },
 });
 
 define({
     name: "word",
+    // TODO: Make a test inside of a `:` definiton for this, does it do what I think it should? Maybe my idea of immediate is completely wrong now
+    isImmediate: true,
     impl: ({ ctx }) => {
         const word = consume({
             until: /\s/,
@@ -292,7 +303,7 @@ define({
     name: "find",
     impl: ({ ctx }) => {
         const word = ctx.pop() as string;
-        let entry = latest;
+        let entry: Dictionary | null = latest;
 
         while (entry) {
             if (entry.name == word) {
@@ -310,8 +321,6 @@ define({
 define({
     name: "interpret",
     impl: ({ ctx }) => {
-        const { interpreter } = ctx;
-
         if (ctx.inputStreamPointer >= ctx.inputStream.length) {
             // No input left to process
             ctx.halt();
@@ -319,13 +328,16 @@ define({
         }
 
         coreWordImpl("word")({ ctx });
-        const word = ctx.pop() as string;
+        const word = ctx.peek() as string;
 
-        // Input only had whitespace, will halt on the next call to `execute`.
-        // TODO: Is this necessary? We're popping word and then pushing it back
-        if (!word.match(/\S/)) return;
+        // Input only had whitespace, will halt on the next call to `execute`. Technically could achieve this by checking in the above halt
+        // check, but...
+        // TODO: What if we halt here instead? Does word/consume break with an empty input stream?
+        if (!word.match(/\S/)) {
+            ctx.pop();
+            return;
+        }
 
-        ctx.push(word);
         coreWordImpl("find")({ ctx });
         const dictionaryEntry = ctx.pop() as Dictionary | undefined;
 
@@ -333,29 +345,25 @@ define({
             const primitiveMaybe = wordAsPrimitive({ word });
 
             if (primitiveMaybe.isPrimitive) {
-                if (interpreter === "queryWord") {
-                    ctx.push(primitiveMaybe.value);
-                    return;
-                } else {
-                    ctx.compilationTarget!.compiled!.push(coreWordImpl("lit"));
-                    ctx.compilationTarget!.compiled!.push(primitiveMaybe.value);
-                    return;
-                }
+                ctx.compilationTarget.compiled.push(coreWordImpl("lit"));
+                ctx.compilationTarget.compiled.push(primitiveMaybe.value);
+                return;
             }
 
             throw new Error(`Couldn't comprehend word '${word}'`);
         }
 
-        if (interpreter === "queryWord" || dictionaryEntry.isImmediate) {
+        if (dictionaryEntry.isImmediate) {
             return dictionaryEntry.impl({ ctx });
         } else {
-            ctx.compilationTarget!.compiled!.push(dictionaryEntry.impl);
+            ctx.compilationTarget.compiled.push(dictionaryEntry.impl);
         }
     },
 });
 
 define({
     name: ":",
+    isImmediate: true,
     impl: ({ ctx }) => {
         let dictionaryEntry: typeof latest;
 
@@ -370,21 +378,18 @@ define({
                 // colon definition". CatScript always calls `impl`, so we use this with
                 // a closure to `dictionaryEntry` to do what "DOCOL" does
                 ctx.returnStack.push({
-                    dictionaryEntry: dictionaryEntry!,
+                    dictionaryEntry,
                     i: 0,
-                    prevInterpreter: ctx.interpreter,
                 });
             },
         });
         // `define` has now set `latest` to the new word, and that's the word we need
         // to execute later.
         dictionaryEntry = latest;
-        dictionaryEntry!.compiled = [];
-        ctx.interpreter = "compileWord";
-
-        // In most Forth's, compilation occurs directly into `latest`. But here
-        // we enable compilation into entries which don't end up in the main
-        // dictionary. See the definiton of "on" in the web section for an example.
+        dictionaryEntry.compiled = [];
+        ctx.interpreterStack.push({
+            prevCompilationTarget: ctx.compilationTarget,
+        });
         ctx.compilationTarget = dictionaryEntry;
     },
 });
@@ -392,8 +397,7 @@ define({
 define({
     name: "exit",
     impl: ({ ctx }) => {
-        const { prevInterpreter } = ctx.returnStack.pop()!;
-        ctx.interpreter = prevInterpreter;
+        ctx.returnStack.pop();
     },
 });
 
@@ -401,13 +405,13 @@ define({
     name: ";",
     isImmediate: true,
     impl: ({ ctx }) => {
-        ctx.compilationTarget!.compiled!.push(coreWordImpl("exit"));
+        ctx.compilationTarget.compiled.push(coreWordImpl("exit"));
 
-        // TODO: If this is always the case, then `:` should throw an error if
-        //       run from outside queryWord mode (i.e. can't define a word inside
-        //       another word definition), right? Need to look at Jonesforth
-        ctx.interpreter = "queryWord";
-        ctx.compilationTarget = null;
+        const prevInterpreter = ctx.interpreterStack.pop();
+        if (!prevInterpreter) {
+            throw new Error("Interpreter stack underflow");
+        }
+        ctx.compilationTarget = prevInterpreter.prevCompilationTarget;
     },
 });
 
@@ -425,12 +429,12 @@ define({
         // words, it compiles in a function which compiles them.
         // This seems right a la https://forth-standard.org/standard/core/POSTPONE
         if (dictionaryEntry.isImmediate) {
-            ctx.compilationTarget!.compiled!.push(dictionaryEntry.impl);
+            ctx.compilationTarget.compiled.push(dictionaryEntry.impl);
         } else {
             const impl: Dictionary["impl"] = ({ ctx }) => {
-                ctx.compilationTarget!.compiled!.push(dictionaryEntry.impl);
+                ctx.compilationTarget.compiled.push(dictionaryEntry.impl);
             };
-            ctx.compilationTarget!.compiled!.push(impl);
+            ctx.compilationTarget.compiled.push(impl);
         }
     },
 });
@@ -439,18 +443,17 @@ define({
     name: "immediate",
     isImmediate: true,
     impl: ({ ctx }) => {
-        // When `immediate` occurs within a definition, it can occur in a word which
-        // will not end up in the dictionary (i.e. not overwrite `latest`),
-        // e.g. `: x immediate ... ;` but if it occurs outside the definition e.g.
-        // `: x ... ; immediate` that will only work to adjust `latest`
-        const target = ctx.compilationTarget ?? latest;
-        target!.isImmediate = true;
+        // In many Forths, immediate can or must come after a definition,
+        // i.e. `: x ... ; immediate`,
+        // but because of this Forth's "Always Be Compiling" strategy,
+        // it must occur before the compilation target is unset
+        ctx.compilationTarget.isImmediate = true;
     },
 });
 
 define({
     name: ",",
-    impl: ({ ctx }) => ctx.compilationTarget?.compiled!.push(ctx.pop()),
+    impl: ({ ctx }) => ctx.compilationTarget.compiled.push(ctx.pop()),
 });
 
 // TODO: Standard Forth has a useful and particular meaning for `'`, aka `tick`,
@@ -471,7 +474,7 @@ define({
     impl: ({ ctx }) => {
         const { dictionaryEntry, i } = ctx.peekReturnStack();
 
-        const compiled = dictionaryEntry?.compiled![i];
+        const compiled = dictionaryEntry.compiled[i];
 
         if (!compiled || typeof compiled !== "function")
             throw new Error("tick must be followed by a word");
@@ -487,11 +490,26 @@ define({
     impl: ({ ctx }) => {
         const { dictionaryEntry, i } = ctx.peekReturnStack();
 
-        const literal = dictionaryEntry?.compiled![i];
+        const literal = dictionaryEntry.compiled[i];
 
         ctx.push(literal);
 
         ctx.advanceCurrentFrame();
+    },
+});
+
+define({
+    name: "compileNow:",
+    isImmediate: true,
+    impl: ({ ctx }) => {
+        coreWordImpl("word")({ ctx });
+        const word = ctx.pop() as string;
+        const primitiveMaybe = wordAsPrimitive({ word });
+        if (!primitiveMaybe.isPrimitive) {
+            throw new Error("compileNow: must be followed by a primitive");
+        }
+
+        ctx.compilationTarget.compiled.push(primitiveMaybe.value);
     },
 });
 
@@ -505,23 +523,17 @@ define({
 define({
     name: "here",
     impl: ({ ctx }) => {
-        // TODO: This should throw an error if no compilation target. I'm only not
-        //       implementing now because I want to implement tests asserting thrown
-        //       errors first
+        // TODO: Maybe this doesn't make sense anymore?
         const dictionaryEntry = ctx.compilationTarget;
-        if (!dictionaryEntry)
-            throw new Error("Can't use `here` outside of a definition");
-        // TODO: Is this 0 hiding a bug? If there's no compiled array, what?
-        const i = dictionaryEntry?.compiled?.length || 0;
+        const i = dictionaryEntry.compiled.length;
         // This shape merges the "return stack frame" and the "variable" types to
         // refer to a location within a dictionary entry's "compiled" data. In Forth,
         // this is much simpler since can point anywhere in linear memory!
         ctx.push({
             dictionaryEntry,
             i,
-            getter: () => dictionaryEntry!.compiled![i],
-            setter: (_value: unknown) =>
-                (dictionaryEntry!.compiled![i] = _value),
+            getter: () => dictionaryEntry.compiled[i],
+            setter: (_value: unknown) => (dictionaryEntry.compiled[i] = _value),
         });
     },
 });
@@ -567,7 +579,7 @@ define({
     impl: ({ ctx }) => {
         const { dictionaryEntry, i } = ctx.peekReturnStack();
 
-        const offset = dictionaryEntry.compiled![i];
+        const offset = dictionaryEntry.compiled[i];
 
         if (typeof offset !== "number" || Number.isNaN(offset)) {
             throw new Error("`branch` must be followed by a number");
@@ -583,7 +595,7 @@ define({
         const { dictionaryEntry, i } = ctx.peekReturnStack();
 
         const condition = ctx.pop();
-        const offset = dictionaryEntry.compiled![i];
+        const offset = dictionaryEntry.compiled[i];
 
         if (typeof condition !== "number" || Number.isNaN(condition)) {
             throw new Error(
@@ -606,7 +618,7 @@ define({
         const { dictionaryEntry, i } = ctx.peekReturnStack();
 
         const condition = ctx.pop();
-        const offset = dictionaryEntry.compiled![i];
+        const offset = dictionaryEntry.compiled[i];
 
         if (typeof offset !== "number" || Number.isNaN(offset)) {
             throw new Error("`falsyBranch` must be followed by a number");
@@ -620,6 +632,7 @@ define({
 
 define({
     name: "var:",
+    isImmediate: true,
     impl: ({ ctx }) => {
         coreWordImpl("word")({ ctx });
         const name = ctx.pop() as string;
@@ -672,11 +685,12 @@ define({
 
 define({
     name: "const:",
+    isImmediate: true,
     impl: ({ ctx }) => {
+        coreWordImpl("word")({ ctx });
         // This variable is actually going to be the
         // value of the variable, via JavaScript closures
-        const value = ctx.pop() as unknown;
-        coreWordImpl("word")({ ctx });
+        let value: unknown;
         const name = ctx.pop() as string;
         define({
             name,
@@ -684,6 +698,10 @@ define({
                 ctx.push(value);
             },
         });
+        const impl: Dictionary["impl"] = ({ ctx }) => {
+            value = ctx.pop() as unknown;
+        };
+        ctx.compilationTarget.compiled.push(impl);
     },
 });
 
@@ -695,7 +713,7 @@ define({
         ctx.paused = true;
         setTimeout(() => {
             ctx.paused = false;
-            query({ ctx });
+            query({ ctx, execute: false });
         }, millis);
     },
 });
@@ -722,7 +740,9 @@ define({
     name: "'debugger",
     isImmediate: true,
     impl: ({ ctx }) => {
-        console.log("Interpreter immediately paused with context:", ctx);
+        // TODO: DO NOT TURN ON FOR TESTING. LOCALLY, THIS CAUSES
+        //       A HUGE DUMP TO CONSOLE.
+        // console.log("Interpreter immediately paused with context:", ctx);
         console.log(
             `Here is the input stream, with \`<--!-->\` marking the input stream pointer`,
         );
@@ -745,39 +765,19 @@ define({
 });
 
 define({
-    name: "((",
-    isImmediate: true,
-    impl: ({ ctx }) => {
-        consume({ until: "))", including: true, ctx });
-    },
-});
-
-define({
     name: ".",
     isImmediate: true,
     impl({ ctx }) {
-        // TODO: See note in definition of "'" about the state of the interpreter
-        if (ctx.interpreter === "compileWord") {
-            // Move cursor past the single blank space between
-            ctx.inputStreamPointer++;
-            coreWordImpl("word")({ ctx });
-            const prop = ctx.pop() as string;
+        // Move cursor past the single blank space between
+        ctx.inputStreamPointer++;
+        coreWordImpl("word")({ ctx });
+        const prop = ctx.pop() as string;
 
-            const impl: Dictionary["impl"] = ({ ctx }) => {
-                const obj = ctx.pop() as any;
-                ctx.push(obj[prop]);
-            };
-            ctx.compilationTarget!.compiled!.push(impl);
-        } else {
-            // Move cursor past the single blank space between
-            ctx.inputStreamPointer++;
-            coreWordImpl("word")({ ctx });
-            const prop = ctx.pop() as string;
-
+        const impl: Dictionary["impl"] = ({ ctx }) => {
             const obj = ctx.pop() as any;
-
             ctx.push(obj[prop]);
-        }
+        };
+        ctx.compilationTarget.compiled.push(impl);
     },
 });
 
@@ -785,30 +785,17 @@ define({
     name: ".!",
     isImmediate: true,
     impl({ ctx }) {
-        // TODO: See note in definition of "'" about the state of the interpreter
-        if (ctx.interpreter === "compileWord") {
-            // Move cursor past the single blank space between
-            ctx.inputStreamPointer++;
-            coreWordImpl("word")({ ctx });
-            const prop = ctx.pop() as string;
+        // Move cursor past the single blank space between
+        ctx.inputStreamPointer++;
+        coreWordImpl("word")({ ctx });
+        const prop = ctx.pop() as string;
 
-            const impl: Dictionary["impl"] = ({ ctx }) => {
-                const obj = ctx.pop() as any;
-                const value = ctx.pop() as any;
-                obj[prop] = value;
-            };
-            ctx.compilationTarget!.compiled!.push(impl);
-        } else {
-            // Move cursor past the single blank space between
-            ctx.inputStreamPointer++;
-            coreWordImpl("word")({ ctx });
-            const prop = ctx.pop() as string;
-
+        const impl: Dictionary["impl"] = ({ ctx }) => {
             const obj = ctx.pop() as any;
-
             const value = ctx.pop() as any;
             obj[prop] = value;
-        }
+        };
+        ctx.compilationTarget.compiled.push(impl);
     },
 });
 
@@ -844,6 +831,7 @@ define({
 
 define({
     name: "wordToFunc:",
+    isImmediate: true,
     impl({ ctx }) {
         coreWordImpl("word")({ ctx });
         coreWordImpl("find")({ ctx });
@@ -853,9 +841,9 @@ define({
             ctx.returnStack.push({
                 dictionaryEntry,
                 i: 0,
-                prevInterpreter: ctx.interpreter,
             });
-            query({ ctx });
+            // There is no inputStream to execute
+            query({ ctx, execute: false });
             if (ctx.parameterStack.length > 0) return ctx.pop();
         });
     },
@@ -867,8 +855,6 @@ define({
     impl({ ctx }) {
         coreWordImpl("word")({ ctx });
         const fnName = ctx.pop() as string;
-        // TODO: See note in definition of "'" about the state of the interpreter
-
         const impl: Dictionary["impl"] = ({ ctx }) => {
             const [obj, args] = [
                 ctx.pop() as unknown,
@@ -877,11 +863,8 @@ define({
             const fn = (obj as Record<typeof fnName, Function>)[fnName!];
             ctx.push(fn.apply(obj, args));
         };
-        if (ctx.interpreter === "compileWord") {
-            ctx.compilationTarget!.compiled!.push(impl);
-        } else {
-            impl({ ctx });
-        }
+
+        ctx.compilationTarget.compiled.push(impl);
     },
 });
 
@@ -925,11 +908,11 @@ function executeColonDefinition({ ctx }: { ctx: Context }) {
     const { dictionaryEntry, i } = ctx.peekReturnStack();
     ctx.advanceCurrentFrame();
     // If someone leaves off a `;`, e.g. `on click 1`, just exit normally
-    if (i === dictionaryEntry!.compiled!.length) {
+    if (i === dictionaryEntry.compiled.length) {
         coreWordImpl("exit")({ ctx });
         return;
     }
-    const callable = dictionaryEntry!.compiled![i]!;
+    const callable = dictionaryEntry.compiled[i];
     if (typeof callable !== "function")
         throw new Error("Attempted to execute a non-function definition");
     callable({ ctx });
@@ -968,7 +951,29 @@ export function consume({
     return value;
 }
 
-export function query({ ctx }: { ctx: Context }) {
+define({
+    name: "EXECUTE",
+    isImmediate: true,
+    impl({ ctx }) {
+        ctx.returnStack.push({
+            dictionaryEntry: ctx.compilationTarget,
+            i: 0,
+        });
+    },
+});
+
+// If `execute`, then immediately execute after compiling
+export function query({
+    ctx,
+    execute = true,
+}: {
+    ctx: Context;
+    execute?: boolean;
+}) {
+    if (execute) {
+        ctx.inputStream += " EXECUTE ";
+    }
+
     // Unlike Jonesforth, don't begin with Quit because it's valid in CatScript to
     // run with a non-empty, meaningful return stack, as in the case of async code
     // which is resuming
@@ -982,19 +987,22 @@ export function query({ ctx }: { ctx: Context }) {
 }
 
 // Words written in the language!
+// TODO: It's probably a good idea to put these in a separately loaded file
+//       for development to differentiate between errors in the above core
+//       and this point when we feel we can start interpreting
 query({
     ctx: {
         ...newCtx(),
         inputStream: `
-  : ahead           here 0 , ;
-  : <back           here -stackFrame , ;
-  : if              postpone falsyBranch ahead ;                immediate
-  : endif           here over -stackFrame swap ! ;              immediate
-  : else            postpone branch ahead swap postpone endif ; immediate
-  : begin           here ;                                      immediate
-  : until           postpone falsyBranch <back ;                immediate
-  : again           postpone branch <back ;                     immediate
-  : repeat          postpone again postpone endif ;             immediate
+  : ahead                here 0 , ;
+  : <back                here -stackFrame , ;
+  : if     immediate     postpone falsyBranch ahead ;
+  : endif  immediate     here over -stackFrame swap ! ;
+  : else   immediate     postpone branch ahead swap postpone endif ;
+  : begin  immediate     here ;
+  : until  immediate     postpone falsyBranch <back ;
+  : again  immediate     postpone branch <back ;
+  : repeat immediate     postpone again postpone endif ;
  `,
     },
 });
@@ -1097,6 +1105,9 @@ define({
     name: "clone",
     impl: ({ ctx }) => {
         const array = ctx.pop() as Array<unknown>;
+        if (!Array.isArray(array)) {
+            throw new Error("Attempted to clone a non-array argument");
+        }
         const clone = [...array];
         ctx.push(clone);
     },
@@ -1121,14 +1132,16 @@ define({
     name: "each",
     isImmediate: true,
     impl: ({ ctx }) => {
-        if (!ctx.compilationTarget) {
-            throw new Error("Can't use each outside of compilation");
-        }
-        ctx.compilationTarget!.compiled!.push(coreWordImpl("clone"));
-        ctx.compilationTarget!.compiled!.push(coreWordImpl(">control"));
-        ctx.compilationTarget!.compiled!.push(coreWordImpl("lit"));
-        ctx.compilationTarget!.compiled!.push(0);
-        ctx.compilationTarget!.compiled!.push(coreWordImpl(">control"));
+        ctx.compilationTarget.compiled.push(() => {
+            if (!Array.isArray(ctx.peek())) {
+                throw new Error("`each` requires an array argument");
+            }
+        });
+        ctx.compilationTarget.compiled.push(coreWordImpl("clone"));
+        ctx.compilationTarget.compiled.push(coreWordImpl(">control"));
+        ctx.compilationTarget.compiled.push(coreWordImpl("lit"));
+        ctx.compilationTarget.compiled.push(0);
+        ctx.compilationTarget.compiled.push(coreWordImpl(">control"));
 
         const impl: Dictionary["impl"] = ({ ctx }) => {
             const index = ctx.controlStack.pop() as number;
@@ -1141,13 +1154,13 @@ define({
             // beginning of the loop body, which is just beyond the "every loop" stuff.
             ctx.advanceCurrentFrame(1);
         };
-        ctx.compilationTarget!.compiled!.push(impl);
+        ctx.compilationTarget.compiled.push(impl);
 
         // Push to the param stack the location where we need to jump back before
         // every loop
         coreWordImpl("here")({ ctx });
         // TODO: Why do we need an empty cell here? Off-by-one with the jumping back index?
-        ctx.compilationTarget!.compiled!.push(null);
+        ctx.compilationTarget.compiled.push(null);
     },
 });
 
@@ -1190,7 +1203,7 @@ define({
             ctx.advanceCurrentFrame(offset);
         };
 
-        ctx.compilationTarget!.compiled!.push(impl);
+        ctx.compilationTarget.compiled.push(impl);
     },
 });
 
@@ -1198,20 +1211,12 @@ define({
     name: "re/",
     isImmediate: true,
     impl: ({ ctx }) => {
-        // TODO: See note in definition of "'" about the state of the interpreter
-        if (ctx.interpreter === "compileWord") {
-            // Move cursor past the single blank space between
-            ctx.inputStreamPointer++;
-            // TODO: Handle escaped forward slashes (\/)
-            const regexp = consume({ until: "/", including: true, ctx });
-            ctx.compilationTarget!.compiled!.push(coreWordImpl("lit"));
-            ctx.compilationTarget!.compiled!.push(new RegExp(regexp));
-        } else {
-            // Move cursor past the single blank space between
-            ctx.inputStreamPointer++;
-            const regexp = consume({ until: "/", including: true, ctx });
-            ctx.push(new RegExp(regexp));
-        }
+        // Move cursor past the single blank space between
+        ctx.inputStreamPointer++;
+        // TODO: Handle escaped forward slashes (\/)
+        const regexp = consume({ until: "/", including: true, ctx });
+        ctx.compilationTarget.compiled.push(coreWordImpl("lit"));
+        ctx.compilationTarget.compiled.push(new RegExp(regexp));
     },
 });
 
@@ -1228,25 +1233,14 @@ define({
     name: "match/",
     isImmediate: true,
     impl: ({ ctx }) => {
-        // TODO: See note in definition of "'" about the state of the interpreter
-        if (ctx.interpreter === "compileWord") {
-            // Move cursor past the single blank space between
-            ctx.inputStreamPointer++;
-            // TODO: Handle escaped forward slashes (\/)
-            const regexp = consume({ until: "/", including: true, ctx });
-            ctx.compilationTarget!.compiled!.push(coreWordImpl("lit"));
-            ctx.compilationTarget!.compiled!.push(new RegExp(regexp));
-            ctx.compilationTarget!.compiled!.push(coreWordImpl("swap"));
-            ctx.compilationTarget!.compiled!.push(coreWordImpl("match"));
-        } else {
-            const str = ctx.pop();
-            // Move cursor past the single blank space between
-            ctx.inputStreamPointer++;
-            const regexp = consume({ until: "/", including: true, ctx });
-            ctx.push(new RegExp(regexp));
-            ctx.push(str);
-            coreWordImpl("match")({ ctx });
-        }
+        // Move cursor past the single blank space between
+        ctx.inputStreamPointer++;
+        // TODO: Handle escaped forward slashes (\/)
+        const regexp = consume({ until: "/", including: true, ctx });
+        ctx.compilationTarget.compiled.push(coreWordImpl("lit"));
+        ctx.compilationTarget.compiled.push(new RegExp(regexp));
+        ctx.compilationTarget.compiled.push(coreWordImpl("swap"));
+        ctx.compilationTarget.compiled.push(coreWordImpl("match"));
     },
 });
 

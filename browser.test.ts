@@ -1,10 +1,5 @@
 import { newCtx, query, type Context, type Dictionary, define } from "./index";
-import {
-    load,
-    runAttributes,
-    uncallableDictionaryImplementation,
-    globals,
-} from "./browser.ts";
+import { load, runAttributes, globals } from "./browser.ts";
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
 import { expect, test, describe, beforeEach, afterEach, mock } from "bun:test";
 
@@ -14,19 +9,6 @@ export const html: typeof String.raw = (templates, ...args) =>
 
 load();
 GlobalRegistrator.register();
-describe("Test utility", () => {
-    test("uncallableDictionaryImplementation", () => {
-        const dictionaryEntry: Dictionary = {
-            previous: null,
-            name: "test entry",
-            impl: uncallableDictionaryImplementation,
-        };
-
-        expect(() => dictionaryEntry.impl({ ctx: newCtx() })).toThrowError(
-            "Uncallable dictionary entry 'test entry' called",
-        );
-    });
-});
 describe("DOM Basics", () => {
     let ctx: Context;
     beforeEach(() => {
@@ -107,9 +89,9 @@ describe("DOM Basics", () => {
         query({ ctx });
         expect(ctx.parameterStack).toEqual([]);
         expect(button!.classList.contains("clazz")).toBe(false);
+        ctx = newCtx();
         ctx.inputStream = "' clazz' C . me toggleClass";
-        ctx.inputStreamPointer = 0;
-        ctx.halted = false;
+        ctx.me = button;
         query({ ctx });
         expect(button!.classList.contains("clazz")).toBe(true);
     });
@@ -241,7 +223,7 @@ describe("DOM Basics", () => {
         );
     });
 
-    test("on", () => {
+    test("on and emit", () => {
         document.body.innerHTML = html`<span
             ><button class="clazz">My button</button></span
         >`;
