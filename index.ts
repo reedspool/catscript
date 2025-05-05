@@ -932,16 +932,18 @@ export function consume({
     if (ignoreLeadingWhitespace) {
         consume({ until: /\S/, ctx });
     }
-    let value = "";
+    const originalInputStreamPointer = ctx.inputStreamPointer;
     while (ctx.inputStreamPointer < ctx.inputStream.length) {
         const char = ctx.inputStream[ctx.inputStreamPointer];
-        if (!char) throw new Error("Input stream overflow");
+        if (!char) throw new Error("Input stream underflow");
         if (typeof until === "string" && char === until) break;
         if (typeof until !== "string" && until.test(char)) break;
         ctx.inputStreamPointer++;
-        // TODO I bet this could be optimized a lot simply by first searching for the first instance of until and then taking a substring.
-        value += char;
     }
+    let value = ctx.inputStream.slice(
+        originalInputStreamPointer,
+        ctx.inputStreamPointer,
+    );
     if (including) ctx.inputStreamPointer++;
     // Strip out escape sequences
     value = value.replaceAll(
