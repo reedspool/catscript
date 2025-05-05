@@ -45,7 +45,6 @@ export function uncallableDictionaryImplementation(this: Dictionary) {
     throw new Error(`Uncallable dictionary entry '${this.name}' called`);
 }
 
-let anonCount = 0;
 export const newCtx: () => Context = () => {
     let resolveHaltedPromise: () => void;
     const haltedPromise = new Promise<void>(
@@ -53,7 +52,6 @@ export const newCtx: () => Context = () => {
     );
 
     const BASE = define({
-        name: `ANONYMOUS-${anonCount++}`,
         impl: uncallableDictionaryImplementation,
     });
     return {
@@ -111,11 +109,16 @@ export const newCtx: () => Context = () => {
 let doneDefiningCoreWords = false;
 export const coreWords: Record<Dictionary["name"], Dictionary> = {};
 
+let anonCount = 0;
 export function define({
     name,
     impl,
     isImmediate = false,
-}: Omit<Dictionary, "previous" | "compiled">): Dictionary {
+}: {
+    name?: Dictionary["name"];
+    impl: Dictionary["impl"];
+    isImmediate?: Dictionary["isImmediate"];
+}): Dictionary {
     // TODO: Right now, there's only one global dictionary which is shared
     //       across all contexts. Considering how this might be isolated to
     //       a context object. Seems wasteful to copy "core" functions like those
@@ -126,20 +129,17 @@ export function define({
     // @ts-ignore Add debug info. How could we extend the type of our function to
     //            include this?
     impl.__debug__originalWord = name;
-    // TODO: Fix typescript later to allow no name instead and get rid of this special word
     const dictionaryEntry: Dictionary = {
         previous: latest,
-        name,
+        name: name ?? `anonymous-${anonCount++}`,
         impl,
         isImmediate,
         compiled: [],
     };
-    if (name.startsWith("ANONYMOUS")) {
-        // Don't actually set latest, or a core word, just give it back
+    if (!name) {
         return dictionaryEntry;
     }
     latest = dictionaryEntry;
-    // TODO: When I looked at this, I had a thought about the above issue.
     if (!doneDefiningCoreWords) {
         if (name in coreWords)
             throw new Error(`Redefining core word '${name}'`);
@@ -330,9 +330,7 @@ define({
         coreWordImpl("word")({ ctx });
         const word = ctx.peek() as string;
 
-        // Input only had whitespace, will halt on the next call to `execute`. Technically could achieve this by checking in the above halt
-        // check, but...
-        // TODO: What if we halt here instead? Does word/consume break with an empty input stream?
+        // Input only had whitespace, will halt on the next call to `execute`.
         if (!word.match(/\S/)) {
             ctx.pop();
             return;
@@ -405,8 +403,8 @@ define({
     name: ";",
     isImmediate: true,
     impl: ({ ctx }) => {
-        ctx.compilationTarget.compiled.push(coreWordImpl("exit"));
-
+        // See executeColonDefinition if you're wondering
+        // why `exit` isn't compiled here.
         const prevInterpreter = ctx.interpreterStack.pop();
         if (!prevInterpreter) {
             throw new Error("Interpreter stack underflow");
@@ -469,11 +467,13 @@ define({
 //       percent signs. I'm not sure what to do.
 define({
     name: "tick",
-    // TODO: This will only work in a word flagged `immediate`
-    //       non-immediate impl should be possible via WORD, FIND, and >CFA according to Jonesforth
     impl: ({ ctx }) => {
         const { dictionaryEntry, i } = ctx.peekReturnStack();
 
+        // This is a "trick" implementation copied from Jonesforth. There, the trick
+        // only works in word flagged `immediate`. Non-immediate impl should be
+        // possible via WORD, FIND, and >CFA according to Jonesforth, but now in
+        // this "always be compiling" strategy, it just works here
         const compiled = dictionaryEntry.compiled[i];
 
         if (!compiled || typeof compiled !== "function")
@@ -523,7 +523,6 @@ define({
 define({
     name: "here",
     impl: ({ ctx }) => {
-        // TODO: Maybe this doesn't make sense anymore?
         const dictionaryEntry = ctx.compilationTarget;
         const i = dictionaryEntry.compiled.length;
         // This shape merges the "return stack frame" and the "variable" types to
@@ -636,20 +635,19 @@ define({
     impl: ({ ctx }) => {
         coreWordImpl("word")({ ctx });
         const name = ctx.pop() as string;
-        // This variable is actually going to be the
-        // value of the variable, via JavaScript closures
-        let value: unknown;
-        define({
+        const dictionaryEntry = define({
             name,
             impl: ({ ctx }) => {
                 // Naming the variable puts this special
                 // getter/setter object onto the stack
                 // and then the @ word will access the getter
                 // and the ! word will use the setter
-                // TODO Could we use the dictionary entry object itself for this?
+                // We use the dictionary entry's first
+                // compiled location as a convenient, already required place to store the value
                 const variable: Variable = {
-                    getter: () => value,
-                    setter: (_value: unknown) => (value = _value),
+                    getter: () => dictionaryEntry.compiled[0],
+                    setter: (_value: unknown) =>
+                        (dictionaryEntry.compiled[0] = _value),
                 };
                 ctx.push(variable);
             },
@@ -740,9 +738,6 @@ define({
     name: "'debugger",
     isImmediate: true,
     impl: ({ ctx }) => {
-        // TODO: DO NOT TURN ON FOR TESTING. LOCALLY, THIS CAUSES
-        //       A HUGE DUMP TO CONSOLE.
-        // console.log("Interpreter immediately paused with context:", ctx);
         console.log(
             `Here is the input stream, with \`<--!-->\` marking the input stream pointer`,
         );
@@ -884,8 +879,6 @@ export function findDictionaryEntry({
 // Because a primitive value can be any of the falsy JS values, we can't signal
 // failure to parse by returning a falsy. Instead wrap the return value in a
 // non-primitive container with a flag and the value
-// TODO Except that we aren't using undefined. Could make that and true and false
-// normal words and have undefined mean not primitive here
 function wordAsPrimitive({ word }: { word: Dictionary["name"] }) {
     let value;
     if (word.match(/^-?\d+$/)) {
@@ -896,6 +889,8 @@ function wordAsPrimitive({ word }: { word: Dictionary["name"] }) {
         value = true;
     } else if (word === "false") {
         value = false;
+    } else if (word === "undefined") {
+        value = undefined;
     } else {
         return { isPrimitive: false };
     }
@@ -903,11 +898,14 @@ function wordAsPrimitive({ word }: { word: Dictionary["name"] }) {
     return { isPrimitive: true, value };
 }
 
-// TODO I think this is now basically Jonesforth's "NEXT"?
+// Basically Jonesforth's "NEXT", but also calls "EXIT"
+// if done
 function executeColonDefinition({ ctx }: { ctx: Context }) {
     const { dictionaryEntry, i } = ctx.peekReturnStack();
     ctx.advanceCurrentFrame();
-    // If someone leaves off a `;`, e.g. `on click 1`, just exit normally
+    // Jonesforth appends `exit` to every compilation via `;`, which is simpler
+    // than this conditional. However, we also want to support someone leaving
+    // off the terminating `;`, e.g. `on click 1`
     if (i === dictionaryEntry.compiled.length) {
         coreWordImpl("exit")({ ctx });
         return;
@@ -928,7 +926,7 @@ export function consume({
     including?: boolean;
     ctx: Context;
     ignoreLeadingWhitespace?: boolean;
-}) {
+}): string {
     if (ignoreLeadingWhitespace) {
         consume({ until: /\S/, ctx });
     }
@@ -940,7 +938,7 @@ export function consume({
         if (typeof until !== "string" && until.test(char)) break;
         ctx.inputStreamPointer++;
     }
-    let value = ctx.inputStream.slice(
+    let value: string = ctx.inputStream.slice(
         originalInputStreamPointer,
         ctx.inputStreamPointer,
     );
@@ -1215,8 +1213,15 @@ define({
     impl: ({ ctx }) => {
         // Move cursor past the single blank space between
         ctx.inputStreamPointer++;
-        // TODO: Handle escaped forward slashes (\/)
         const regexp = consume({ until: "/", including: true, ctx });
+
+        // TODO: Handle escaped forward slashes (\/)
+        //  but NOTE that `consume` has some escape
+        // stuff which is relied upon, probably need to check on all of that.
+        // let regexp = "";
+        // do {
+        //     regexp += consume({ until: "/", including: true, ctx });
+        // } while (ctx.inputStream[ctx.inputStreamPointer - 1] === "\\");
         ctx.compilationTarget.compiled.push(coreWordImpl("lit"));
         ctx.compilationTarget.compiled.push(new RegExp(regexp));
     },

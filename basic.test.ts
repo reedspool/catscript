@@ -17,14 +17,12 @@ type MyTests = Record<
 >;
 describe("Test utility", () => {
     test("uncallableDictionaryImplementation", () => {
-        const name = "ANONYMOUS";
         const dictionaryEntry: Dictionary = define({
-            name,
             impl: uncallableDictionaryImplementation,
         });
 
         expect(() => dictionaryEntry.impl({ ctx: newCtx() })).toThrowError(
-            `Uncallable dictionary entry '${name}' called`,
+            /Uncallable dictionary entry 'anonymous-\d+' called/,
         );
     });
 });
@@ -40,8 +38,8 @@ describe("Core - Synchronous", () => {
     });
 
     tests["Primitives are parsed as JS"] = {
-        input: "-1 5 0 12345 2.2 2.00001 true false",
-        resultantStack: [-1, 5, 0, 12345, 2.2, 2.00001, true, false],
+        input: "-1 5 0 12345 2.2 2.00001 true false undefined",
+        resultantStack: [-1, 5, 0, 12345, 2.2, 2.00001, true, false, undefined],
     };
 
     tests["Strings aren't CatScript primitives but they end up as JS strings"] =
@@ -127,8 +125,16 @@ describe("Core - Synchronous", () => {
         input: "word nowhitespace true",
         resultantStack: ["nowhitespace", true],
     };
-    tests["immediate"] = {
+    tests["word within `:`"] = {
+        input: ": tryword word nowhitespace true ; tryword",
+        resultantStack: ["nowhitespace", true],
+    };
+    tests["immediate and tick"] = {
         input: ": bury immediate tick lit , ' Bury' , tick swap , ; : pushCheck ' Top' bury ; pushCheck",
+        resultantStack: ["Bury", "Top"],
+    };
+    tests["tick outside immediate"] = {
+        input: ": bury tick lit , ' Bury' , tick swap , ; : pushCheck ' Top' bury ; pushCheck",
         resultantStack: ["Bury", "Top"],
     };
     tests["typeof"] = {
