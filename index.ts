@@ -27,6 +27,8 @@ export type Context = {
     controlStack: unknown[];
     compilationTarget: Dictionary;
     inputStream: string;
+    executeAtEnd: boolean;
+    didExecuteAndEnd: boolean;
     paused: boolean;
     halted: boolean;
     halt: () => Promise<void>;
@@ -51,9 +53,6 @@ export const newCtx: () => Context = () => {
         (resolve) => (resolveHaltedPromise = resolve),
     );
 
-    const BASE = define({
-        impl: uncallableDictionaryImplementation,
-    });
     return {
         me: null,
         parameterStack: [],
@@ -61,6 +60,8 @@ export const newCtx: () => Context = () => {
         interpreterStack: [],
         controlStack: [],
         inputStream: "",
+        executeAtEnd: true,
+        didExecuteAndEnd: false,
         paused: false,
         halted: false,
         haltedPromise,
@@ -70,7 +71,9 @@ export const newCtx: () => Context = () => {
             return haltedPromise;
         },
         inputStreamPointer: 0,
-        compilationTarget: BASE,
+        compilationTarget: define({
+            impl: uncallableDictionaryImplementation,
+        }),
         pop() {
             if (this.parameterStack.length < 1)
                 throw new Error("Stack underflow");
@@ -286,7 +289,6 @@ define({
 
 define({
     name: "word",
-    // TODO: Make a test inside of a `:` definiton for this, does it do what I think it should? Maybe my idea of immediate is completely wrong now
     isImmediate: true,
     impl: ({ ctx }) => {
         const word = consume({
@@ -322,6 +324,20 @@ define({
     name: "interpret",
     impl: ({ ctx }) => {
         if (ctx.inputStreamPointer >= ctx.inputStream.length) {
+            if (ctx.executeAtEnd && !ctx.didExecuteAndEnd) {
+                ctx.didExecuteAndEnd = true;
+
+                // Unwind and execute the top-level interpreter only
+                let prevInterpreter = ctx.interpreterStack.pop();
+                while (prevInterpreter) {
+                    ctx.compilationTarget =
+                        prevInterpreter.prevCompilationTarget;
+                    prevInterpreter = ctx.interpreterStack.pop();
+                }
+
+                coreWordImpl("EXECUTE")({ ctx });
+                return;
+            }
             // No input left to process
             ctx.halt();
             return;
@@ -711,7 +727,7 @@ define({
         ctx.paused = true;
         setTimeout(() => {
             ctx.paused = false;
-            query({ ctx, execute: false });
+            query({ ctx });
         }, millis);
     },
 });
@@ -838,7 +854,8 @@ define({
                 i: 0,
             });
             // There is no inputStream to execute
-            query({ ctx, execute: false });
+            ctx.executeAtEnd = false;
+            query({ ctx });
             if (ctx.parameterStack.length > 0) return ctx.pop();
         });
     },
@@ -955,25 +972,34 @@ define({
     name: "EXECUTE",
     isImmediate: true,
     impl({ ctx }) {
+        const dictionaryEntry = ctx.compilationTarget;
+        // TODO what does this mean if the interpreterStack is not empty?  E.g.
+        // `on click ' You clicked' log` <-- since the input stream is
+        // terminated without a `;`, the compilation target is still the
+        // anonymous dictionary entry from `on` This is confusing behavior so
+        // I'm leaving this warning for myself, however the current behavior
+        // is that this doesn't happen unless you call EXECUTE yourself, since
+        // the `executeAtEnd` behavior unwinds the interpreter stack first.
+        if (ctx.interpreterStack.length > 0) {
+            console.warn(
+                `EXECUTE on a non-empty interpreterStack behavior is undefined`,
+            );
+        }
+        // Reset the compilation target so things don't get executed twice if
+        // this is in the middle of the inputStream
+        ctx.compilationTarget = define({
+            impl: uncallableDictionaryImplementation,
+        });
+
         ctx.returnStack.push({
-            dictionaryEntry: ctx.compilationTarget,
+            dictionaryEntry,
             i: 0,
         });
     },
 });
 
 // If `execute`, then immediately execute after compiling
-export function query({
-    ctx,
-    execute = true,
-}: {
-    ctx: Context;
-    execute?: boolean;
-}) {
-    if (execute) {
-        ctx.inputStream += " EXECUTE ";
-    }
-
+export function query({ ctx }: { ctx: Context }) {
     // Unlike Jonesforth, don't begin with Quit because it's valid in CatScript to
     // run with a non-empty, meaningful return stack, as in the case of async code
     // which is resuming

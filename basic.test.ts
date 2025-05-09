@@ -129,6 +129,14 @@ describe("Core - Synchronous", () => {
         input: ": tryword word nowhitespace true ; tryword",
         resultantStack: ["nowhitespace", true],
     };
+    tests["word within `:` but reads on usage"] = {
+        input: ": tryword: immediate postpone word false drop true ; tryword: nowhitespace",
+        resultantStack: ["nowhitespace", true],
+    };
+    tests["EXECUTE within :"] = {
+        input: ": running 5 2 + EXECUTE ; true",
+        resultantStack: [7, true],
+    };
     tests["immediate and tick"] = {
         input: ": bury immediate tick lit , ' Bury' , tick swap , ; : pushCheck ' Top' bury ; pushCheck",
         resultantStack: ["Bury", "Top"],
@@ -327,8 +335,8 @@ describe("Core - Synchronous", () => {
     };
 
     tests["quit"] = {
-        input: ": inner 42 quit ; : outer inner 33 ; outer true",
-        resultantStack: [42, true],
+        input: ": inner 42 quit ; : outer inner 33 ; outer false",
+        resultantStack: [42],
     };
 
     tests["latest"] = {

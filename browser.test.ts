@@ -134,8 +134,20 @@ describe("DOM Basics", () => {
         expect(ctx.parameterStack.length).toEqual(1);
         expect((ctx.parameterStack[0] as Element).tagName).toEqual("BUTTON");
     });
+    test("on terminated with ';'", () => {
+        document.body.innerHTML = html`<span
+            ><button class="clazz">My button</button></span
+        >`;
+        const button = document.querySelector("button");
 
-    test("on", () => {
+        ctx.inputStream = "on click ' Success!' C . me >text ;";
+        ctx.me = button;
+        query({ ctx });
+        button!.click();
+        expect(ctx.parameterStack).toEqual([]);
+        expect(button!.innerHTML).toEqual("Success!");
+    });
+    test("on with no terminating ';'", () => {
         document.body.innerHTML = html`<span
             ><button class="clazz">My button</button></span
         >`;
@@ -147,6 +159,19 @@ describe("DOM Basics", () => {
         button!.click();
         expect(ctx.parameterStack).toEqual([]);
         expect(button!.innerHTML).toEqual("Success!");
+    });
+    test("on after another statement", () => {
+        document.body.innerHTML = html`<span><button>My button</button></span>`;
+        const button = document.querySelector("button");
+
+        ctx.inputStream =
+            "' clazz' C . me addClass on click ' Success!' C . me >text";
+        ctx.me = button;
+        query({ ctx });
+        button!.click();
+        expect(ctx.parameterStack).toEqual([]);
+        expect(button!.innerHTML).toEqual("Success!");
+        expect(button!.classList.contains("clazz")).toBe(true);
     });
 
     test("next", () => {

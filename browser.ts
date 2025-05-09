@@ -137,6 +137,7 @@ export function load() {
                     ctx: {
                         ...newCtx(),
                         me: target,
+                        executeAtEnd: false,
                         parameterStack: [event],
                         returnStack: [
                             {
@@ -193,6 +194,7 @@ export function load() {
                     ctx: {
                         ...newCtx(),
                         me: target,
+                        executeAtEnd: false,
                         returnStack: [
                             {
                                 dictionaryEntry,
