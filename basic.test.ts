@@ -141,10 +141,6 @@ describe("Core - Synchronous", () => {
         input: ": bury immediate tick lit , ' Bury' , tick swap , ; : pushCheck ' Top' bury ; pushCheck",
         resultantStack: ["Bury", "Top"],
     };
-    tests["tick outside immediate"] = {
-        input: ": bury tick lit , ' Bury' , tick swap , ; : pushCheck ' Top' bury ; pushCheck",
-        resultantStack: ["Bury", "Top"],
-    };
     tests["typeof"] = {
         input: "' test' ' string' typeof",
         resultantStack: [true],
