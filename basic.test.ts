@@ -146,12 +146,12 @@ describe("Core - Synchronous", () => {
         resultantStack: [true],
     };
     tests["=="] = {
-        input: "5 5 == ' a' ' a' ==",
-        resultantStack: [true, true],
+        input: "5 5 == ' a' ' a' == false ' ' == 5 ' 5' == [  ] ' ' ==",
+        resultantStack: [true, true, true, true, true],
     };
     tests["==="] = {
-        input: "5 5 === 5 ' 5' === ' a' ' a' ===",
-        resultantStack: [true, false, true],
+        input: "5 5 == ' a' ' a' == false ' ' === 5 ' 5' === [  ] ' ' ===",
+        resultantStack: [true, true, false, false, false],
     };
     tests["< and >"] = {
         input: "4 5 < 5 4 > && ",
