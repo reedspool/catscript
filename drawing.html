@@ -1,0 +1,105 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="x-ua-compatible" content="ie=edge" />
+    <title>Drawing</title>
+    <meta name="description" content="Drawing with CatScript" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root {
+        --color-bg-black: #282828;
+        --color-fg-white: white;
+
+        background-color: var(--color-bg-black);
+        color: var(--color-fg-white);
+      }
+
+      html {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        display: flex;
+      }
+
+      body {
+        width: 100%;
+        margin: 0;
+        padding: 0;
+
+        display: flex;
+      }
+
+      canvas {
+        height: 100%;
+        width: 100%;
+      }
+    </style>
+    <script type="module">
+      import { globals, load } from "./build/browser.js";
+      load();
+      globals();
+    </script>
+  </head>
+
+  <body>
+    <canvas>JavaScript required</canvas>
+    <script type="application/javascript">
+      const canvas = document.querySelector("canvas");
+      function setCanvasDimensions() {
+        let clientRect = canvas.getBoundingClientRect();
+        const d = {
+          width: clientRect.width,
+          height: clientRect.height,
+          center: {
+            x: clientRect.width / 2,
+            y: clientRect.height / 2,
+          },
+        };
+        globalThis.d = d;
+        canvas.width = d.width;
+        canvas.height = d.height;
+      }
+
+      window.addEventListener("resize", setCanvasDimensions);
+
+      window.addEventListener("DOMContentLoaded", setCanvasDimensions);
+    </script>
+    <script type="application/catscript">
+      ' CatScript is running! (script tag)' log
+      globalThis . document select' canvas' first
+      C .! me
+      [ ' 2d' ] C . me .apply: getContext
+      const: draw
+      : draw: immediate draw postpone .apply: ;
+      : background
+          ' rgba(0, 0, 0, 0.1)' draw .! fillStyle
+          [ 0 0 globalThis . d . width globalThis . d . height ]
+          draw: fillRect drop
+      ;
+      background
+      : drawCircle ( x y r -- )
+          0
+          globalThis . Math . PI 2 *
+          true
+          6 collect
+          draw: arc drop
+          [] draw: fill drop
+      ;
+      [] const: circles
+      on mousemove
+          ' mouse move' log >control
+          [ I . clientX I . clientY 40 ( radius ) ]
+          circles push
+          circles . length 10 > if [] circles .apply: unshift endif
+         ;
+      : onframe
+          background
+          ' white' draw .! fillStyle
+          [] draw: beginPath drop
+          circles each I spread drawCircle endeach
+      ;
+      [ wordToFunc: onframe 33 ] globalThis . setInterval jsApply
+    </script>
+  </body>
+</html>
