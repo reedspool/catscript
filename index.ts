@@ -152,6 +152,16 @@ export function define({
     return dictionaryEntry;
 }
 
+export function compile({
+    ctx,
+    value,
+}: {
+    ctx: Context;
+    value: Dictionary["compiled"][0];
+}) {
+    ctx.compilationTarget.compiled.push(value);
+}
+
 export function coreWordImpl(name: Dictionary["name"]) {
     const dictionaryEntry = coreWords[name];
     if (!dictionaryEntry)
@@ -211,8 +221,8 @@ define({
         // Move cursor past the single blank space between
         ctx.inputStreamPointer++;
         const text = consume({ until: "'", including: true, ctx });
-        ctx.compilationTarget.compiled.push(coreWordImpl("lit"));
-        ctx.compilationTarget.compiled.push(text);
+        compile({ ctx, value: coreWordImpl("lit") });
+        compile({ ctx, value: text });
     },
 });
 
@@ -360,8 +370,8 @@ define({
             const primitiveMaybe = wordAsPrimitive({ word });
 
             if (primitiveMaybe.isPrimitive) {
-                ctx.compilationTarget.compiled.push(coreWordImpl("lit"));
-                ctx.compilationTarget.compiled.push(primitiveMaybe.value);
+                compile({ ctx, value: coreWordImpl("lit") });
+                compile({ ctx, value: primitiveMaybe.value });
                 return;
             }
 
@@ -371,7 +381,7 @@ define({
         if (dictionaryEntry.isImmediate) {
             return dictionaryEntry.impl({ ctx });
         } else {
-            ctx.compilationTarget.compiled.push(dictionaryEntry.impl);
+            compile({ ctx, value: dictionaryEntry.impl });
         }
     },
 });
@@ -444,12 +454,12 @@ define({
         // words, it compiles in a function which compiles them.
         // This seems right a la https://forth-standard.org/standard/core/POSTPONE
         if (dictionaryEntry.isImmediate) {
-            ctx.compilationTarget.compiled.push(dictionaryEntry.impl);
+            compile({ ctx, value: dictionaryEntry.impl });
         } else {
             const impl: Dictionary["impl"] = ({ ctx }) => {
-                ctx.compilationTarget.compiled.push(dictionaryEntry.impl);
+                compile({ ctx, value: dictionaryEntry.impl });
             };
-            ctx.compilationTarget.compiled.push(impl);
+            compile({ ctx, value: impl });
         }
     },
 });
@@ -468,7 +478,7 @@ define({
 
 define({
     name: ",",
-    impl: ({ ctx }) => ctx.compilationTarget.compiled.push(ctx.pop()),
+    impl: ({ ctx }) => compile({ ctx, value: ctx.pop() }),
 });
 
 // TODO: Standard Forth has a useful and particular meaning for `'`, aka `tick`,
@@ -526,7 +536,7 @@ define({
             throw new Error("compileNow: must be followed by a primitive");
         }
 
-        ctx.compilationTarget.compiled.push(primitiveMaybe.value);
+        compile({ ctx, value: primitiveMaybe.value });
     },
 });
 
@@ -716,7 +726,7 @@ define({
         const impl: Dictionary["impl"] = ({ ctx }) => {
             value = ctx.pop() as unknown;
         };
-        ctx.compilationTarget.compiled.push(impl);
+        compile({ ctx, value: impl });
     },
 });
 
@@ -789,7 +799,7 @@ define({
             const obj = ctx.pop() as any;
             ctx.push(obj[prop]);
         };
-        ctx.compilationTarget.compiled.push(impl);
+        compile({ ctx, value: impl });
     },
 });
 
@@ -807,7 +817,7 @@ define({
             const value = ctx.pop() as any;
             obj[prop] = value;
         };
-        ctx.compilationTarget.compiled.push(impl);
+        compile({ ctx, value: impl });
     },
 });
 
@@ -877,7 +887,7 @@ define({
             ctx.push(fn.apply(obj, args));
         };
 
-        ctx.compilationTarget.compiled.push(impl);
+        compile({ ctx, value: impl });
     },
 });
 
@@ -1158,16 +1168,19 @@ define({
     name: "each",
     isImmediate: true,
     impl: ({ ctx }) => {
-        ctx.compilationTarget.compiled.push(() => {
-            if (!Array.isArray(ctx.peek())) {
-                throw new Error("`each` requires an array argument");
-            }
+        compile({
+            ctx,
+            value: () => {
+                if (!Array.isArray(ctx.peek())) {
+                    throw new Error("`each` requires an array argument");
+                }
+            },
         });
-        ctx.compilationTarget.compiled.push(coreWordImpl("clone"));
-        ctx.compilationTarget.compiled.push(coreWordImpl(">control"));
-        ctx.compilationTarget.compiled.push(coreWordImpl("lit"));
-        ctx.compilationTarget.compiled.push(0);
-        ctx.compilationTarget.compiled.push(coreWordImpl(">control"));
+        compile({ ctx, value: coreWordImpl("clone") });
+        compile({ ctx, value: coreWordImpl(">control") });
+        compile({ ctx, value: coreWordImpl("lit") });
+        compile({ ctx, value: 0 });
+        compile({ ctx, value: coreWordImpl(">control") });
 
         const impl: Dictionary["impl"] = ({ ctx }) => {
             const index = ctx.controlStack.pop() as number;
@@ -1180,13 +1193,13 @@ define({
             // beginning of the loop body, which is just beyond the "every loop" stuff.
             ctx.advanceCurrentFrame(1);
         };
-        ctx.compilationTarget.compiled.push(impl);
+        compile({ ctx, value: impl });
 
         // Push to the param stack the location where we need to jump back before
         // every loop
         coreWordImpl("here")({ ctx });
         // TODO: Why do we need an empty cell here? Off-by-one with the jumping back index?
-        ctx.compilationTarget.compiled.push(null);
+        compile({ ctx, value: null });
     },
 });
 
@@ -1229,7 +1242,7 @@ define({
             ctx.advanceCurrentFrame(offset);
         };
 
-        ctx.compilationTarget.compiled.push(impl);
+        compile({ ctx, value: impl });
     },
 });
 
@@ -1248,8 +1261,8 @@ define({
         // do {
         //     regexp += consume({ until: "/", including: true, ctx });
         // } while (ctx.inputStream[ctx.inputStreamPointer - 1] === "\\");
-        ctx.compilationTarget.compiled.push(coreWordImpl("lit"));
-        ctx.compilationTarget.compiled.push(new RegExp(regexp));
+        compile({ ctx, value: coreWordImpl("lit") });
+        compile({ ctx, value: new RegExp(regexp) });
     },
 });
 
@@ -1270,10 +1283,10 @@ define({
         ctx.inputStreamPointer++;
         // TODO: Handle escaped forward slashes (\/)
         const regexp = consume({ until: "/", including: true, ctx });
-        ctx.compilationTarget.compiled.push(coreWordImpl("lit"));
-        ctx.compilationTarget.compiled.push(new RegExp(regexp));
-        ctx.compilationTarget.compiled.push(coreWordImpl("swap"));
-        ctx.compilationTarget.compiled.push(coreWordImpl("match"));
+        compile({ ctx, value: coreWordImpl("lit") });
+        compile({ ctx, value: new RegExp(regexp) });
+        compile({ ctx, value: coreWordImpl("swap") });
+        compile({ ctx, value: coreWordImpl("match") });
     },
 });
 
