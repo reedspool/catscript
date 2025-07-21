@@ -658,7 +658,7 @@ describe("Core - errors", () => {
     test("Incorrect usage of `;`", () => {
         ctx.inputStream = ";";
         expect(() => query({ ctx })).toThrowError(
-            "Interpreter stack underflow",
+            "Compilation stack underflow",
         );
     });
 

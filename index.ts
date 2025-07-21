@@ -21,9 +21,7 @@ export type Context = {
         dictionaryEntry: Dictionary;
         i: number;
     }[];
-    interpreterStack: Array<{
-        prevCompilationTarget: Context["compilationTarget"];
-    }>;
+    compilationStack: Array<Context["compilationTarget"]>;
     controlStack: Array<unknown>;
     compilationTarget: Dictionary;
     inputStream: string;
@@ -58,7 +56,7 @@ export const newCtx: () => Context = () => {
         me: null,
         parameterStack: [],
         returnStack: [],
-        interpreterStack: [],
+        compilationStack: [],
         controlStack: [],
         inputStream: "",
         executeAtEnd: true,
@@ -341,11 +339,10 @@ define({
                 ctx.didExecuteAndEnd = true;
 
                 // Unwind and execute the top-level interpreter only
-                let prevInterpreter = ctx.interpreterStack.pop();
-                while (prevInterpreter) {
-                    ctx.compilationTarget =
-                        prevInterpreter.prevCompilationTarget;
-                    prevInterpreter = ctx.interpreterStack.pop();
+                let previous = ctx.compilationStack.pop();
+                while (previous) {
+                    ctx.compilationTarget = previous;
+                    previous = ctx.compilationStack.pop();
                 }
 
                 coreWordImpl("EXECUTE")({ ctx });
@@ -407,9 +404,7 @@ define({
                 });
             },
         });
-        ctx.interpreterStack.push({
-            prevCompilationTarget: ctx.compilationTarget,
-        });
+        ctx.compilationStack.push(ctx.compilationTarget);
         ctx.compilationTarget = dictionaryEntry;
     },
 });
@@ -427,11 +422,11 @@ define({
     impl: ({ ctx }) => {
         // See executeColonDefinition if you're wondering
         // why `exit` isn't compiled here.
-        const prevInterpreter = ctx.interpreterStack.pop();
-        if (!prevInterpreter) {
-            throw new Error("Interpreter stack underflow");
+        const previous = ctx.compilationStack.pop();
+        if (!previous) {
+            throw new Error("Compilation stack underflow");
         }
-        ctx.compilationTarget = prevInterpreter.prevCompilationTarget;
+        ctx.compilationTarget = previous;
     },
 });
 
@@ -988,7 +983,7 @@ define({
         // I'm leaving this warning for myself, however the current behavior
         // is that this doesn't happen unless you call EXECUTE yourself, since
         // the `executeAtEnd` behavior unwinds the interpreter stack first.
-        if (ctx.interpreterStack.length > 0) {
+        if (ctx.compilationStack.length > 0) {
             console.warn(
                 `EXECUTE on a non-empty interpreterStack behavior is undefined`,
             );
@@ -1088,9 +1083,7 @@ define({
         const dictionaryEntry = define({
             impl: uncallableDictionaryImplementation,
         });
-        ctx.interpreterStack.push({
-            prevCompilationTarget: ctx.compilationTarget,
-        });
+        ctx.compilationStack.push(ctx.compilationTarget);
         ctx.compilationTarget = dictionaryEntry;
     },
 });
@@ -1100,9 +1093,9 @@ define({
     isImmediate: true,
     impl: ({ ctx }) => {
         const array = ctx.compilationTarget.compiled;
-        let prevInterpreter = ctx.interpreterStack.pop();
-        if (!prevInterpreter) throw new Error("`]` used before `[`");
-        ctx.compilationTarget = prevInterpreter.prevCompilationTarget;
+        let previous = ctx.compilationStack.pop();
+        if (!previous) throw new Error("`]` used before `[`");
+        ctx.compilationTarget = previous;
         // Compile the array into the parent compilation target
         compile({ ctx, value: array });
     },

@@ -149,9 +149,7 @@ export function load() {
                 });
             });
 
-            ctx.interpreterStack.push({
-                prevCompilationTarget: ctx.compilationTarget,
-            });
+            ctx.compilationStack.push(ctx.compilationTarget);
             // Compile all words into this anonymous entry until `;`
             ctx.compilationTarget = dictionaryEntry;
         },
