@@ -33,9 +33,10 @@ describe("Core - Synchronous", () => {
         ctx = newCtx();
     });
 
-    test("empty", () => {
-        query({ ctx });
-    });
+    tests["empty"] = {
+        input: "",
+        resultantStack: [],
+    };
 
     tests["Primitives are parsed as JS"] = {
         input: "-1 5 0 12345 2.2 2.00001 true false undefined",
@@ -47,6 +48,13 @@ describe("Core - Synchronous", () => {
             input: "' test string with spaces in it'",
             resultantStack: ["test string with spaces in it"],
         };
+
+    tests[
+        "Strings can contain anything except their delimeters (though escape sequences are stripped)"
+    ] = {
+        input: "' !@#$%^&*()-_=+[]{}\\|\";:\n<>,./?`~'",
+        resultantStack: ['!@#$%^&*()-_=+[]{}|";:\n<>,./?`~'],
+    };
 
     tests["addition"] = {
         input: "3 5 +",

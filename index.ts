@@ -10,23 +10,24 @@ export type Dictionary = {
     name: string;
     previous: Dictionary | null;
     impl: ({ ctx }: { ctx: Context }) => void;
-    compiled: (Dictionary["impl"] | unknown)[];
+    compiled: Array<Dictionary["impl"] | unknown>;
     isImmediate?: boolean;
 };
 let latest: Dictionary;
 export type Context = {
     me: Element | unknown;
-    parameterStack: unknown[];
+    parameterStack: Array<unknown>;
     returnStack: {
         dictionaryEntry: Dictionary;
         i: number;
     }[];
-    interpreterStack: {
+    interpreterStack: Array<{
         prevCompilationTarget: Context["compilationTarget"];
-    }[];
-    controlStack: unknown[];
+    }>;
+    controlStack: Array<unknown>;
     compilationTarget: Dictionary;
     inputStream: string;
+    // If `executeAtEnd`, then immediately execute after compiling
     executeAtEnd: boolean;
     didExecuteAndEnd: boolean;
     paused: boolean;
@@ -129,7 +130,7 @@ export function define({
     //       Maybe each dictionary could have its own dictionary which it searches
     //       first? Then I'd have to distinguish between which dictionary to apply
     //       a new word definition - doesn't seem to bad though.
-    // @ts-ignore Add debug info. How could we extend the type of our function to
+    // @ts-expect-error Add debug info. How could we extend the type of our function to
     //            include this?
     impl.__debug__originalWord = name;
     const dictionaryEntry: Dictionary = {
@@ -460,7 +461,7 @@ define({
         // In many Forths, immediate can or must come after a definition,
         // i.e. `: x ... ; immediate`,
         // but because of this Forth's "Always Be Compiling" strategy,
-        // it must occur before the compilation target is unset
+        // it must occur before the compilation target is unset, i.e. before `;`
         ctx.compilationTarget.isImmediate = true;
     },
 });
@@ -998,7 +999,6 @@ define({
     },
 });
 
-// If `execute`, then immediately execute after compiling
 export function query({ ctx }: { ctx: Context }) {
     // Unlike Jonesforth, don't begin with Quit because it's valid in CatScript to
     // run with a non-empty, meaningful return stack, as in the case of async code
