@@ -182,12 +182,12 @@ describe("Core - Synchronous", () => {
 
     tests["here immediately & -stackFrame outside `:` definition"] = {
         input: ": hereNow immediate here ; hereNow false drop hereNow -stackFrame ",
-        resultantStack: [-3],
+        resultantStack: [-2],
     };
 
     tests["here immediately & -stackFrame within `:` definition"] = {
         input: ": hereNow immediate here ; : def hereNow false drop hereNow -stackFrame ; def",
-        resultantStack: [-3],
+        resultantStack: [-2],
     };
 
     tests["branch"] = {

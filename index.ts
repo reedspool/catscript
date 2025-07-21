@@ -124,23 +124,25 @@ export function define({
     isImmediate?: Dictionary["isImmediate"];
 }): Dictionary {
     // TODO: Right now, there's only one global dictionary which is shared
-    //       across all contexts. Considering how this might be isolated to
-    //       a context object. Seems wasteful to copy "core" functions like those
-    //       defined in JavaScript below across many dictionaries.
-    //       Maybe each dictionary could have its own dictionary which it searches
-    //       first? Then I'd have to distinguish between which dictionary to apply
-    //       a new word definition - doesn't seem to bad though.
-    // @ts-expect-error Add debug info. How could we extend the type of our function to
-    //            include this?
-    impl.__debug__originalWord = name;
+    // across all contexts. Considering how this might be isolated to a context
+    // object. Seems wasteful to copy "core" functions like those defined in
+    // JavaScript below across many dictionaries.  Maybe each context could have
+    // its own dictionary which it searches first? Then I'd have to distinguish
+    // between which dictionary to apply a new word definition - doesn't seem to
+    // bad though. I think this is how "vocabularies" work to some degree?
+    let isAnonymous = !name;
+    name ??= `anonymous-${anonCount++}`;
+    // @ts-expect-error Add debug info. How could we extend the type of our
+    // function to include this?
+    impl.__debug__originalWord ??= name;
     const dictionaryEntry: Dictionary = {
         previous: latest,
-        name: name ?? `anonymous-${anonCount++}`,
+        name,
         impl,
         isImmediate,
         compiled: [],
     };
-    if (!name) {
+    if (isAnonymous) {
         return dictionaryEntry;
     }
     latest = dictionaryEntry;
@@ -370,7 +372,6 @@ define({
             const primitiveMaybe = wordAsPrimitive({ word });
 
             if (primitiveMaybe.isPrimitive) {
-                compile({ ctx, value: coreWordImpl("lit") });
                 compile({ ctx, value: primitiveMaybe.value });
                 return;
             }
@@ -390,12 +391,10 @@ define({
     name: ":",
     isImmediate: true,
     impl: ({ ctx }) => {
-        let dictionaryEntry: typeof latest;
-
         coreWordImpl("word")({ ctx });
         const name = ctx.pop() as string;
 
-        define({
+        const dictionaryEntry = define({
             name,
             impl: ({ ctx }) => {
                 // In Jonesforth and other "indirect threaded Forths", this code would
@@ -408,10 +407,6 @@ define({
                 });
             },
         });
-        // `define` has now set `latest` to the new word, and that's the word we need
-        // to execute later.
-        dictionaryEntry = latest;
-        dictionaryEntry.compiled = [];
         ctx.interpreterStack.push({
             prevCompilationTarget: ctx.compilationTarget,
         });
@@ -938,10 +933,12 @@ function executeColonDefinition({ ctx }: { ctx: Context }) {
         coreWordImpl("exit")({ ctx });
         return;
     }
-    const callable = dictionaryEntry.compiled[i];
-    if (typeof callable !== "function")
-        throw new Error("Attempted to execute a non-function definition");
-    callable({ ctx });
+    const maybeCallable = dictionaryEntry.compiled[i];
+    if (typeof maybeCallable !== "function") {
+        ctx.push(maybeCallable);
+    } else {
+        maybeCallable({ ctx });
+    }
 }
 
 export function consume({
@@ -998,6 +995,7 @@ define({
         }
         // Reset the compilation target so things don't get executed twice if
         // this is in the middle of the inputStream
+        // TODO: This should probably be reset somewhere?
         ctx.compilationTarget = define({
             impl: uncallableDictionaryImplementation,
         });
@@ -1083,22 +1081,30 @@ define({
 
 define({
     name: "[",
+    isImmediate: true,
     impl: ({ ctx }) => {
-        const a = { __marker: true };
-        ctx.push(a);
+        // Make a new compilation target, that's our array
+        // NOTE: This copies logic from `:`, but maybe that makes sense?
+        const dictionaryEntry = define({
+            impl: uncallableDictionaryImplementation,
+        });
+        ctx.interpreterStack.push({
+            prevCompilationTarget: ctx.compilationTarget,
+        });
+        ctx.compilationTarget = dictionaryEntry;
     },
 });
 
 define({
     name: "]",
+    isImmediate: true,
     impl: ({ ctx }) => {
-        const array = [];
-        while (!(ctx.peek() as any).__marker) {
-            array.unshift(ctx.pop());
-        }
-
-        ctx.pop(); // Ditch the marker
-        ctx.push(array);
+        const array = ctx.compilationTarget.compiled;
+        let prevInterpreter = ctx.interpreterStack.pop();
+        if (!prevInterpreter) throw new Error("`]` used before `[`");
+        ctx.compilationTarget = prevInterpreter.prevCompilationTarget;
+        // Compile the array into the parent compilation target
+        compile({ ctx, value: array });
     },
 });
 
