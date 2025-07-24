@@ -6,6 +6,7 @@ import {
     consume,
     type Dictionary,
     uncallableDictionaryImplementation,
+    compile,
 } from "./index";
 
 /**
@@ -88,12 +89,12 @@ export function load() {
             // Move cursor past the single blank space between
             ctx.inputStreamPointer++;
             const selector = consume({ until: "'", including: true, ctx });
-            ctx.compilationTarget!.compiled!.push(selector);
-            ctx.compilationTarget!.compiled!.push(coreWordImpl("swap"));
+            compile({ ctx, value: selector });
+            compile({ ctx, value: coreWordImpl("swap") });
             ctx.push("select");
             coreWordImpl("find")({ ctx });
             const dictionaryEntry = ctx.pop() as Dictionary;
-            ctx.compilationTarget!.compiled!.push(dictionaryEntry.impl);
+            compile({ ctx, value: dictionaryEntry.impl });
         },
     });
 
@@ -148,9 +149,8 @@ export function load() {
                 });
             });
 
-            ctx.compilationStack.push(ctx.compilationTarget);
             // Compile all words into this anonymous entry until `;`
-            ctx.compilationTarget = dictionaryEntry;
+            ctx.compilationStack.push(dictionaryEntry);
         },
     });
 

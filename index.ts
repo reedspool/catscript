@@ -21,9 +21,10 @@ export type Context = {
         dictionaryEntry: Dictionary;
         i: number;
     }[];
-    compilationStack: Array<Context["compilationTarget"]>;
+    compilationStack: Array<Dictionary>;
+    peekCompilationStack: () => Dictionary;
+    popCompilationStack: () => Dictionary;
     controlStack: Array<unknown>;
-    compilationTarget: Dictionary;
     inputStream: string;
     // If `executeAtEnd`, then immediately execute after compiling
     executeAtEnd: boolean;
@@ -56,7 +57,25 @@ export const newCtx: () => Context = () => {
         me: null,
         parameterStack: [],
         returnStack: [],
-        compilationStack: [],
+        compilationStack: [
+            define({
+                impl: uncallableDictionaryImplementation,
+            }),
+        ],
+        peekCompilationStack() {
+            const frame = this.compilationStack.at(-1);
+            if (!frame) {
+                throw new Error("Compilation stack underflow");
+            }
+            return frame;
+        },
+        popCompilationStack() {
+            const frame = this.compilationStack.pop();
+            if (!frame) {
+                throw new Error("Compilation stack underflow");
+            }
+            return frame;
+        },
         controlStack: [],
         inputStream: "",
         executeAtEnd: true,
@@ -70,9 +89,6 @@ export const newCtx: () => Context = () => {
             return haltedPromise;
         },
         inputStreamPointer: 0,
-        compilationTarget: define({
-            impl: uncallableDictionaryImplementation,
-        }),
         pop() {
             if (this.parameterStack.length < 1)
                 throw new Error("Stack underflow");
@@ -159,7 +175,7 @@ export function compile({
     ctx: Context;
     value: Dictionary["compiled"][0];
 }) {
-    ctx.compilationTarget.compiled.push(value);
+    ctx.peekCompilationStack().compiled.push(value);
 }
 
 export function coreWordImpl(name: Dictionary["name"]) {
@@ -338,13 +354,8 @@ define({
             if (ctx.executeAtEnd && !ctx.didExecuteAndEnd) {
                 ctx.didExecuteAndEnd = true;
 
-                // Unwind and execute the top-level interpreter only
-                let previous = ctx.compilationStack.pop();
-                while (previous) {
-                    ctx.compilationTarget = previous;
-                    previous = ctx.compilationStack.pop();
-                }
-
+                // Unwind and execute only the top-level compilation
+                ctx.compilationStack.length = 1;
                 coreWordImpl("EXECUTE")({ ctx });
                 return;
             }
@@ -404,8 +415,7 @@ define({
                 });
             },
         });
-        ctx.compilationStack.push(ctx.compilationTarget);
-        ctx.compilationTarget = dictionaryEntry;
+        ctx.compilationStack.push(dictionaryEntry);
     },
 });
 
@@ -422,11 +432,7 @@ define({
     impl: ({ ctx }) => {
         // See executeColonDefinition if you're wondering
         // why `exit` isn't compiled here.
-        const previous = ctx.compilationStack.pop();
-        if (!previous) {
-            throw new Error("Compilation stack underflow");
-        }
-        ctx.compilationTarget = previous;
+        ctx.popCompilationStack();
     },
 });
 
@@ -460,9 +466,9 @@ define({
     impl: ({ ctx }) => {
         // In many Forths, immediate can or must come after a definition,
         // i.e. `: x ... ; immediate`,
-        // but because of this Forth's "Always Be Compiling" strategy,
-        // it must occur before the compilation target is unset, i.e. before `;`
-        ctx.compilationTarget.isImmediate = true;
+        // but because of our "Always Be Compiling" strategy, it must occur
+        // before the compilation target is unset, i.e. before `;`
+        ctx.peekCompilationStack().isImmediate = true;
     },
 });
 
@@ -540,7 +546,7 @@ define({
 define({
     name: "here",
     impl: ({ ctx }) => {
-        const dictionaryEntry = ctx.compilationTarget;
+        const dictionaryEntry = ctx.peekCompilationStack();
         const i = dictionaryEntry.compiled.length;
         // This shape merges the "return stack frame" and the "variable" types to
         // refer to a location within a dictionary entry's "compiled" data. In Forth,
@@ -975,30 +981,9 @@ define({
     name: "EXECUTE",
     isImmediate: true,
     impl({ ctx }) {
-        const dictionaryEntry = ctx.compilationTarget;
-        // TODO what does this mean if the interpreterStack is not empty?  E.g.
-        // `on click ' You clicked' log` <-- since the input stream is
-        // terminated without a `;`, the compilation target is still the
-        // anonymous dictionary entry from `on` This is confusing behavior so
-        // I'm leaving this warning for myself, however the current behavior
-        // is that this doesn't happen unless you call EXECUTE yourself, since
-        // the `executeAtEnd` behavior unwinds the interpreter stack first.
-        if (ctx.compilationStack.length > 0) {
-            console.warn(
-                `EXECUTE on a non-empty interpreterStack behavior is undefined`,
-            );
-        }
-        // Reset the compilation target so things don't get executed twice if
-        // this is in the middle of the inputStream
-        // TODO: This should probably be reset somewhere?
-        ctx.compilationTarget = define({
-            impl: uncallableDictionaryImplementation,
-        });
+        const dictionaryEntry = ctx.peekCompilationStack();
 
-        ctx.returnStack.push({
-            dictionaryEntry,
-            i: 0,
-        });
+        ctx.returnStack.push({ dictionaryEntry, i: 0 });
     },
 });
 
@@ -1083,8 +1068,7 @@ define({
         const dictionaryEntry = define({
             impl: uncallableDictionaryImplementation,
         });
-        ctx.compilationStack.push(ctx.compilationTarget);
-        ctx.compilationTarget = dictionaryEntry;
+        ctx.compilationStack.push(dictionaryEntry);
     },
 });
 
@@ -1092,12 +1076,9 @@ define({
     name: "]",
     isImmediate: true,
     impl: ({ ctx }) => {
-        const array = ctx.compilationTarget.compiled;
-        let previous = ctx.compilationStack.pop();
-        if (!previous) throw new Error("`]` used before `[`");
-        ctx.compilationTarget = previous;
+        const frame = ctx.popCompilationStack();
         // Compile the array into the parent compilation target
-        compile({ ctx, value: array });
+        compile({ ctx, value: frame.compiled });
     },
 });
 
