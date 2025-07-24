@@ -88,7 +88,6 @@ export function load() {
             // Move cursor past the single blank space between
             ctx.inputStreamPointer++;
             const selector = consume({ until: "'", including: true, ctx });
-            ctx.compilationTarget!.compiled!.push(coreWordImpl("lit"));
             ctx.compilationTarget!.compiled!.push(selector);
             ctx.compilationTarget!.compiled!.push(coreWordImpl("swap"));
             ctx.push("select");
