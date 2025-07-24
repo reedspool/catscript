@@ -194,22 +194,22 @@ describe("Core - Synchronous", () => {
         // Note the calculation has to account for the `lit` in front of each
         // string value, and the indexing begins after the `branch` call, on
         // the one compiled item from `compileNow: 5`
-        input: "true branch compileNow: 5 ' ❌1' ' ❌2' true false drop ",
+        input: "true branch compileNow: 3 ' ❌1' ' ❌2' true false drop ",
         resultantStack: [true, true],
     };
 
     tests["branch within `:`"] = {
-        input: "false drop : 3, immediate 3 , ; : branchy true branch 3, ' ❌1' ' ❌2' drop ; branchy ",
+        input: "false drop : branchy true branch compileNow: 2 ' ❌1' ' ❌2' drop ; branchy ",
         resultantStack: [true],
     };
 
     tests["0 0branch"] = {
-        input: "true 0 0branch compileNow: 5 ' ❌1' ' ❌2' true false drop",
+        input: "true 0 0branch compileNow: 3 ' ❌1' ' ❌2' true false drop",
         resultantStack: [true, true],
     };
 
     tests["0 0branch within `:`"] = {
-        input: "false drop : branchy true 0 0branch 3, ' ❌1' ' ❌2' drop ; branchy",
+        input: "false drop : branchy true 0 0branch compileNow: 2 ' ❌1' ' ❌2' drop ; branchy",
         resultantStack: [true],
     };
 
@@ -224,22 +224,22 @@ describe("Core - Synchronous", () => {
     };
 
     tests["Falsy falsyBranch"] = {
-        input: "true false falsyBranch compileNow: 3 ' ❌1' true false drop",
+        input: "true false falsyBranch compileNow: 2 ' ❌1' true false drop",
         resultantStack: [true, true],
     };
 
     tests["Falsy falsyBranch within `:`"] = {
-        input: "false drop : branchy true false falsyBranch 3, ' ❌1' ; branchy",
+        input: "false drop : branchy true false falsyBranch compileNow: 2 ' ❌1' ; branchy",
         resultantStack: [true],
     };
 
     tests["Truthy falsyBranch"] = {
-        input: "' ❌1' true falsyBranch 3, drop true ",
+        input: "' ❌1' true falsyBranch compileNow: 3 drop true ",
         resultantStack: [true],
     };
 
     tests["Truthy falsyBranch within `:`"] = {
-        input: "false drop : branchy ' ❌1' true falsyBranch 3, drop true ; branchy",
+        input: "false drop : branchy ' ❌1' true falsyBranch compileNow: 3 drop true ; branchy",
         resultantStack: [true],
     };
 

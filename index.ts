@@ -79,7 +79,7 @@ export const newCtx: () => Context = () => {
             return this.parameterStack.pop();
         },
         peek() {
-            return this.parameterStack[this.parameterStack.length - 1];
+            return this.parameterStack.at(-1);
         },
         push(...args: unknown[]) {
             this.parameterStack.push(...args);
@@ -88,7 +88,7 @@ export const newCtx: () => Context = () => {
         // current information at the top of the stack. In Jonesforth, there's only
         // one relevant piece of information, but we've got more.
         peekReturnStack() {
-            const stackFrame = this.returnStack[this.returnStack.length - 1];
+            const stackFrame = this.returnStack.at(-1);
             if (!stackFrame) throw new Error("Return stack underflow");
             return stackFrame;
         },
@@ -221,7 +221,6 @@ define({
         // Move cursor past the single blank space between
         ctx.inputStreamPointer++;
         const text = consume({ until: "'", including: true, ctx });
-        compile({ ctx, value: coreWordImpl("lit") });
         compile({ ctx, value: text });
     },
 });
@@ -286,6 +285,7 @@ defineBinaryExactlyAsInJS({ name: ">=" });
 defineBinaryExactlyAsInJS({ name: "<=" });
 defineBinaryExactlyAsInJS({ name: "instanceof" });
 
+// See https://www.forth.org/svfig/Len/Quitloop.htm
 define({
     name: "quit",
     impl: ({ ctx }) => {
@@ -1177,7 +1177,6 @@ define({
         });
         compile({ ctx, value: coreWordImpl("clone") });
         compile({ ctx, value: coreWordImpl(">control") });
-        compile({ ctx, value: coreWordImpl("lit") });
         compile({ ctx, value: 0 });
         compile({ ctx, value: coreWordImpl(">control") });
 
@@ -1260,7 +1259,6 @@ define({
         // do {
         //     regexp += consume({ until: "/", including: true, ctx });
         // } while (ctx.inputStream[ctx.inputStreamPointer - 1] === "\\");
-        compile({ ctx, value: coreWordImpl("lit") });
         compile({ ctx, value: new RegExp(regexp) });
     },
 });
@@ -1282,7 +1280,6 @@ define({
         ctx.inputStreamPointer++;
         // TODO: Handle escaped forward slashes (\/)
         const regexp = consume({ until: "/", including: true, ctx });
-        compile({ ctx, value: coreWordImpl("lit") });
         compile({ ctx, value: new RegExp(regexp) });
         compile({ ctx, value: coreWordImpl("swap") });
         compile({ ctx, value: coreWordImpl("match") });
