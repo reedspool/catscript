@@ -1,0 +1,130 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="x-ua-compatible" content="ie=edge" />
+    <title>CatScript REPL</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <script type="module">
+      import { globals, load } from "./build/browser.js";
+      load();
+      globals();
+    </script>
+
+    <script type="module">
+      // import { query, newCtx } from "./build/index.js";
+    </script>
+  </head>
+
+  <body>
+    <div></div>
+
+    <script>
+      const replOutput = document.currentScript.previousElementSibling;
+    </script>
+
+    <textarea></textarea>
+
+    <script>
+      const textarea = document.currentScript.previousElementSibling;
+
+      const parameterStack = [];
+      function executeTextAreaInput() {
+        // We're locked if we're scrolled all the way to the bottom with some
+        // constant for leeway/error
+        const wasAtBottomOfScroll =
+          replOutput.scrollTop +
+            replOutput.getBoundingClientRect().height +
+            20 >=
+          replOutput.scrollHeight;
+        try {
+          globalThis.catscript.query({
+            ctx: {
+              ...globalThis.catscript.newCtx(),
+              inputStream: textarea.value,
+              parameterStack,
+              me: document.body,
+              emit: (...args) => {
+                args.forEach((text) => (replOutput.innerText += text));
+              },
+            },
+          });
+
+          replOutput.innerText += " ok\n";
+        } catch (error) {
+          replOutput.innerText += error;
+          replOutput.innerText += "\n";
+        }
+
+        document.body.dispatchEvent(new Event("parameterStackUpdated"));
+
+        if (wasAtBottomOfScroll) replOutput.scrollTop = replOutput.scrollHeight;
+
+        // Let Enter default behavior complete, otherwise
+        // newline is created after clearing
+        setTimeout(() => (textarea.value = ""), 0);
+      }
+
+      textarea.addEventListener(
+        "keydown",
+        ({ key }) => key === "Enter" && executeTextAreaInput(),
+      );
+
+      replOutput.innerText += "Enter some text in the box below. \n";
+    </script>
+
+    <button>Run</button>
+
+    <script>
+      const result =
+        document.currentScript.previousElementSibling.addEventListener(
+          "click",
+          () => executeTextAreaInput(),
+        );
+
+      console.log(result);
+    </script>
+
+    <p>
+      Below is the parameter stack. Complex data (like HTML Elements or JS
+      Objects) may appear strange. You can always access the real JS values in
+      the DevTools console from the global variable
+      <code>parameterStack</code>.
+    </p>
+
+    <p>The top of the parameter stack is numbered (1).</p>
+
+    <output></output>
+
+    <script>
+      const parameterStackOutput =
+        document.currentScript.previousElementSibling;
+      document.body.addEventListener("parameterStackUpdated", () => {
+        parameterStackOutput.innerHTML = "";
+
+        if (parameterStack.length === 0) {
+          parameterStackOutput.innerHTML = `<em>parameter stack is empty</em>`;
+        } else {
+          const ol = document.createElement("ol");
+          parameterStack.toReversed().forEach((param) => {
+            const li = document.createElement("li");
+            li.innerText = "" + param;
+            ol.append(li);
+          });
+          parameterStackOutput.append(ol);
+        }
+      });
+    </script>
+
+    <p>
+      <label>
+        Run on "Enter" (not yet implemented) <input type="checkbox" checked />
+        <script>
+          const runOnEnterCheckbox =
+            document.currentScript.previousElementSibling;
+        </script>
+      </label>
+    </p>
+  </body>
+</html>
