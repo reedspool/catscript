@@ -8,11 +8,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
       :root {
-        --color-bg-black: #282828;
-        --color-fg-white: white;
+        /* Dark mode */
+        --color-bg-dark: #282828;
+        --color-fg-light: white;
+        /* Light mode */
+        --color-bg-light: white;
+        --color-fg-dark: #282828;
 
-        background-color: var(--color-bg-black);
-        color: var(--color-fg-white);
+        background-color: var(--color-bg-light);
+        color: var(--color-fg-dark);
       }
 
       html {
@@ -39,6 +43,22 @@
       import { globals, load } from "./build/browser.js";
       load();
       globals();
+
+      // Set up auto-reload
+      const getPageContent = () => {
+        const url = new URL(location.href);
+        url.searchParams.append("r", Math.random());
+        return fetch(url.toString()).then((resp) => resp.text());
+      };
+      const original = await getPageContent();
+      setInterval(async () => {
+        const fresh = await getPageContent();
+        if (fresh != original) {
+          location.reload();
+        } else {
+          console.log("Checked, same");
+        }
+      }, 1000);
     </script>
   </head>
 
@@ -67,39 +87,55 @@
     </script>
     <script type="application/catscript">
       ' CatScript is running! (script tag)' log
-      globalThis . document select' canvas' first
-      C .! me
-      [ ' 2d' ] C . me .apply: getContext
-      const: draw
+      globalThis . document select' canvas' first C .! me
+      globalThis . d . width const: width
+      globalThis . d . height const: height
+      [ ' 2d' ] C . me .apply: getContext const: draw
+      draw globalThis .! my2d
       : draw: immediate draw postpone .apply: ;
       : background
-          ' rgba(0, 0, 0, 0.1)' draw .! fillStyle
-          [ 0 0 globalThis . d . width globalThis . d . height ]
-          draw: fillRect drop
+          ' green' draw .! fillStyle
+          [ 0 0 width height ]
       ;
       background
-      : drawCircle ( x y r -- )
-          0
-          globalThis . Math . PI 2 *
-          true
-          6 collect
-          draw: arc drop
-          [] draw: fill drop
-      ;
-      [] const: circles
-      on mousemove
-          ' mouse move' log >control
-          [ I . clientX I . clientY 40 ( radius ) ]
-          circles push
-          circles . length 10 > if [] circles .apply: unshift endif
-         ;
-      : onframe
-          background
-          ' white' draw .! fillStyle
-          [] draw: beginPath drop
-          circles each I spread drawCircle endeach
-      ;
-      [ wordToFunc: onframe 33 ] globalThis . setInterval jsApply
+      draw . fillStyle log
+      .s
+    </script>
+    <script type="nothing/comment">
+      // Other stuff
+            globalThis . document select' canvas' first
+            C .! me
+            [ ' 2d' ] C . me .apply: getContext
+            const: draw
+            : draw: immediate draw postpone .apply: ;
+            : background
+                ' rgba(0, 0, 0, 0.1)' draw .! fillStyle
+                [ 0 0 globalThis . d . width globalThis . d . height ]
+                draw: fillRect drop
+            ;
+            background
+            : drawCircle ( x y r -- )
+                0
+                globalThis . Math . PI 2 *
+                true
+                6 collect
+                draw: arc drop
+                [] draw: fill drop
+            ;
+            [] const: circles
+            on mousemove
+                ' mouse move' log >control
+                [ I . clientX I . clientY 40 ( radius ) ]
+                circles push
+                circles . length 10 > if [] circles .apply: unshift endif
+               ;
+            : onframe
+                background
+                ' white' draw .! fillStyle
+                [] draw: beginPath drop
+                circles each I spread drawCircle endeach
+            ;
+            [ wordToFunc: onframe 33 ] globalThis . setInterval jsApply
     </script>
   </body>
 </html>
