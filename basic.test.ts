@@ -354,13 +354,18 @@ describe("Core - Synchronous", () => {
     };
 
     tests["const:"] = {
-        input: "42 const: answer answer",
-        resultantStack: [42],
+        input: "42 const: answer 53 answer",
+        resultantStack: [53, 42],
     };
 
     tests["const: within `:`"] = {
-        input: "false drop : test 42 const: answer answer ; test",
-        resultantStack: [42],
+        input: "false drop : test 42 const: answer answer ; 53 test",
+        resultantStack: [53, 42],
+    };
+
+    tests["const: within `:` then referenced outside"] = {
+        input: "false drop : test 82 const: answer ; 53 test answer",
+        resultantStack: [53, 82],
     };
 
     tests["globalThis"] = {
@@ -401,6 +406,11 @@ describe("Core - Synchronous", () => {
     tests["array literal nested"] = {
         input: "[ [ 5 42 ] 2 ]",
         resultantStack: [[[5, 42], 2]],
+    };
+
+    tests["array with a const inside"] = {
+        input: "5 const: amt [ amt 2 ]",
+        resultantStack: [[5, 2]],
     };
 
     tests["spread"] = {

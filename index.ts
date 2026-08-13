@@ -1059,26 +1059,28 @@ define({
     },
 });
 
+const arrayMarker = Symbol("Catscript Array Marker")
 define({
     name: "[",
-    isImmediate: true,
     impl: ({ ctx }) => {
-        // Make a new compilation target, that's our array
-        // NOTE: This copies logic from `:`, but maybe that makes sense?
-        const dictionaryEntry = define({
-            impl: uncallableDictionaryImplementation,
-        });
-        ctx.compilationStack.push(dictionaryEntry);
+        ctx.push(arrayMarker)
     },
 });
 
 define({
     name: "]",
-    isImmediate: true,
     impl: ({ ctx }) => {
-        const frame = ctx.popCompilationStack();
-        // Compile the array into the parent compilation target
-        compile({ ctx, value: frame.compiled });
+        const array = [];
+        while (ctx.parameterStack.length > 0) {
+        const valueOrMarker = ctx.pop()
+            if (valueOrMarker === arrayMarker) {
+ctx.push(array)
+                return;
+            } else {
+                array.unshift(valueOrMarker)
+            }
+        }
+        throw new Error("Couldn't find array marker on stack")
     },
 });
 
